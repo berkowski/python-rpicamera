@@ -1,36 +1,21 @@
+#ifndef RPICAMERA_H_
+#define RPICAMERA_H_
+
 #include <Python.h>
-#include <structmember.h>
-
+// #include <structmember.h>
+// #define PY_ARRAY_UNIQUE_SYMBOL PyArray_API
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#define PY_ARRAY_UNIQUE_SYMBOL RPICAMERA_ARRAY_API
 #include <numpy/arrayobject.h>
-#include "interface/mmal/mmal.h"
 
-typedef struct {
-    PyObject_HEAD
-    MMAL_COMPONENT_T *camera;
-    MMAL_COMPONENT_T *encoder;
-    MMAL_ES_FORMAT_T *format;
-    MMAL_PORT_T *camera_preview_port;
-    MMAL_PORT_T *camera_video_port;
-    MMAL_PORT_T *camera_still_port;
-    MMAL_POOL_T *pool;
+#include "RpiCamera_types.h"
+#include "RpiCamera_settings.h"
+#include "RpiCamera_capture.h"
 
-    PyObject *image;
-   
-} Camera;
-
-static PyMethodDef Camera_methods[] = {
-    // {"enable_encoder", (PyCFunction)Camera_enable_encoder, METH_VARARGS,
-    //     "Enable/Disable the camera"},
-    // {"set_encoder_format", (PyCFunctionWithKeywords)Camera_set_encoder_format, METH_VARARGS | METH_KEYWORDS,
-    //     "Set the encoder format"},
-    // {"set_camera_format", (PyCFunctionWithKeywords)Camera_set_camera_format, METH_VARARGS | METH_KEYWORDS,
-    //     "Set the camera format"},
-    // {"set_flash", (PyCFunctionWithKeywords)Camera_set_flash, METH_VARARGS | METH_KEYWORDS,
-    //     "Set the camera flash parameters"},
-    // {"capture", (PyCFunctionWithKeywords)Camera_capture, METH_VARARGS | METH_KEYWORDS,
-    //     "Capture images from camera"},    
-    
-    {NULL}
+static PyMethodDef RpiCamera_methods[] = {
+    {"capture_still_frames", (PyCFunctionWithKeywords)RpiCamera_capture_stills, METH_VARARGS | METH_KEYWORDS,
+        "Capture still frame(s) using the currently loaded format."},
+    {NULL, NULL, NULL, NULL}
 
 };
 
@@ -39,39 +24,39 @@ static PyMethodDef Camera_methods[] = {
 //     {NULL, NULL, NULL, NULL, NULL}
 // };
 
-static PyObject *Camera_get_image(Camera *self, void *closure);
-static PyObject *Camera_get_camera_setting(Camera *self, void *closure);
-static int Camera_set_camera_setting(Camera *self, PyObject *py_value, void *closure);
+static PyObject *RpiCamera_get_image(RpiCamera *self, void *closure);
+static PyObject *RpiCamera_get_camera_setting(RpiCamera *self, void *closure);
+static int RpiCamera_set_camera_setting(RpiCamera *self, PyObject *py_value, void *closure);
 
-static PyGetSetDef Camera_getseters[] = {
-    {"image", (getter)Camera_get_image, NULL, "Read-only image buffer", NULL},
-    {"saturation", (getter)Camera_get_camera_setting, (setter)Camera_set_camera_setting, "Sensor saturation setting", (void *) MMAL_PARAMETER_SATURATION},
-    {"sharpness", (getter)Camera_get_camera_setting, (setter)Camera_set_camera_setting, "Sensor sharpness setting", (void *) MMAL_PARAMETER_SHARPNESS},
-    {"contrast", (getter)Camera_get_camera_setting, (setter)Camera_set_camera_setting, "Sensor contrast setting", (void *) MMAL_PARAMETER_CONTRAST},
-    {"brightness", (getter)Camera_get_camera_setting, (setter)Camera_set_camera_setting, "Sensor brightness setting", (void *) MMAL_PARAMETER_BRIGHTNESS},
-    {"iso", (getter)Camera_get_camera_setting, (setter)Camera_set_camera_setting, "Sensor ISO setting", (void *) MMAL_PARAMETER_ISO},
-    {"metering_mode", (getter)Camera_get_camera_setting, (setter)Camera_set_camera_setting, "Sensor metering mode", (void *) MMAL_PARAMETER_EXP_METERING_MODE},
-    {"exposure_compensation", (getter)Camera_get_camera_setting, (setter)Camera_set_camera_setting, "Sensor exposure compensation", (void *) MMAL_PARAMETER_CAPTURE_EXPOSURE_COMP},
-    {"video_stabilisation", (getter)Camera_get_camera_setting, (setter)Camera_set_camera_setting, "Sensor video stabilisation", (void *) MMAL_PARAMETER_VIDEO_STABILISATION},
-    {"exposure_mode", (getter)Camera_get_camera_setting, (setter)Camera_set_camera_setting, "Sensor exposure mode", (void *) MMAL_PARAMETER_EXPOSURE_MODE},
-    {"awb_mode", (getter)Camera_get_camera_setting, (setter)Camera_set_camera_setting, "Sensor automatic white-balance mode", (void *) MMAL_PARAMETER_AWB_MODE},
-    {"image_fx", (getter)Camera_get_camera_setting, (setter)Camera_set_camera_setting, "Sensor image effects", (void *) MMAL_PARAMETER_IMAGE_EFFECT},
+static PyGetSetDef RpiCamera_getseters[] = {
+    {"image", (getter)RpiCamera_get_image, NULL, "Read-only image buffer", NULL},
+    {"saturation", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor saturation setting", (void *) MMAL_PARAMETER_SATURATION},
+    {"sharpness", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor sharpness setting", (void *) MMAL_PARAMETER_SHARPNESS},
+    {"contrast", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor contrast setting", (void *) MMAL_PARAMETER_CONTRAST},
+    {"brightness", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor brightness setting", (void *) MMAL_PARAMETER_BRIGHTNESS},
+    {"iso", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor ISO setting", (void *) MMAL_PARAMETER_ISO},
+    {"metering_mode", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor metering mode", (void *) MMAL_PARAMETER_EXP_METERING_MODE},
+    {"exposure_compensation", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor exposure compensation", (void *) MMAL_PARAMETER_CAPTURE_EXPOSURE_COMP},
+    {"video_stabilisation", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor video stabilisation", (void *) MMAL_PARAMETER_VIDEO_STABILISATION},
+    {"exposure_mode", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor exposure mode", (void *) MMAL_PARAMETER_EXPOSURE_MODE},
+    {"awb_mode", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor automatic white-balance mode", (void *) MMAL_PARAMETER_AWB_MODE},
+    {"image_fx", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor image effects", (void *) MMAL_PARAMETER_IMAGE_EFFECT},
     {NULL}
 };
 
 
 
 // New, Init, dealloc prototypes
-static PyObject * Camera_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
-static int Camera_init(Camera *self, PyObject *args, PyObject *kwds);
-static void Camera_dealloc (Camera *self);
+static PyObject * RpiCamera_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
+static int RpiCamera_init(RpiCamera *self, PyObject *args, PyObject *kwds);
+static void RpiCamera_dealloc (RpiCamera *self);
 
-static PyTypeObject CameraType = {
+static PyTypeObject RpiCameraType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "rpicamera.Camera",             /* tp_name */
-    sizeof(Camera),             /* tp_basicsize */
+    sizeof(RpiCamera),             /* tp_basicsize */
     0,                         /* tp_itemsize */
-    (destructor)Camera_dealloc,/* tp_dealloc */
+    (destructor)RpiCamera_dealloc,/* tp_dealloc */
     0,                         /* tp_print */
     0,                         /* tp_getattr */
     0,                         /* tp_setattr */
@@ -95,17 +80,17 @@ static PyTypeObject CameraType = {
     0,                         /* tp_weaklistoffset */
     0,                         /* tp_iter */
     0,                         /* tp_iternext */
-    0, //Camera_methods,  /* tp_methods */
+    RpiCamera_methods,  /* tp_methods */
     0, //Camera_members,  /* tp_members */
-    Camera_getseters,                         /* tp_getset */
+    RpiCamera_getseters,                         /* tp_getset */
     0,                         /* tp_base */
     0,                         /* tp_dict */
     0,                         /* tp_descr_get */
     0,                         /* tp_descr_set */
     0,                         /* tp_dictoffset */
-    (initproc)Camera_init,      /* tp_init */
+    (initproc)RpiCamera_init,      /* tp_init */
     0,                         /* tp_alloc */
-    Camera_new,                 /* tp_new */
+    RpiCamera_new,                 /* tp_new */
 };
 
 static PyModuleDef RpiCameraModule = {
@@ -120,10 +105,10 @@ PyMODINIT_FUNC
 PyInit_RpiCamera(void){
 
     import_array();
-    if (PyType_Ready(&CameraType) < 0)
+    if (PyType_Ready(&RpiCameraType) < 0)
         return NULL;
 
-    Py_INCREF(&CameraType);
+    Py_INCREF(&RpiCameraType);
     
 
     //Import logging module
@@ -136,7 +121,7 @@ PyInit_RpiCamera(void){
         return NULL;
 
     //Add Camera Object
-    PyModule_AddObject(m, "Camera", (PyObject *)&CameraType);
+    PyModule_AddObject(m, "Camera", (PyObject *)&RpiCameraType);
 
 
     //Initialize BCM host board 
@@ -144,3 +129,4 @@ PyInit_RpiCamera(void){
 
     return m;
 }
+#endif

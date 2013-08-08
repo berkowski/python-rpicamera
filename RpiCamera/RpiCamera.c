@@ -2,7 +2,6 @@
 #include "interface/mmal/util/mmal_util_params.h"
 
 #include "RpiCamera.h"
-#include "camera_settings.h"
 
 // Standard port setting for the camera component
 #define MMAL_CAMERA_PREVIEW_PORT 0
@@ -12,8 +11,12 @@
 // Stills format information
 #define DEFAULT_STILLS_FRAME_RATE_NUM 3
 #define DEFAULT_STILLS_FRAME_RATE_DEN 1
-#define DEFAULT_STILLS_WIDTH 2592
-#define DEFAULT_STILLS_HEIGHT 1944
+#define DEFAULT_STILLS_MAX_WIDTH 2624
+#define DEFAULT_STILLS_MAX_HEIGHT 1956
+#define DEFAULT_STILLS_CROP_X_OFFSET 16
+#define DEFAULT_STILLS_CROP_WIDTH 2592
+#define DEFAULT_STILLS_CROP_Y_OFFSET 6
+#define DEFAULT_STILLS_CROP_HEIGHT 1944
 
 #define DEFAULT_PREVIEW_FRAME_RATE_NUM 30
 #define DEFAULT_PREVIEW_FRAME_RATE_DEN  1
@@ -60,18 +63,18 @@ MMAL_STATUS_T __set_default_camera_parameters(MMAL_COMPONENT_T *camera){
     // status |= raspicamcontrol_set_thumbnail_parameters(camera, &params->thumbnailConfig);  TODO Not working for some reason
 }
 
-MMAL_STATUS_T __setup_camera(Camera *CameraObj){
+MMAL_STATUS_T __setup_camera(RpiCamera *RpiCamera){
 
     MMAL_STATUS_T status;
     MMAL_COMPONENT_T *camera = NULL;
     MMAL_ES_FORMAT_T *format;
     MMAL_PORT_T *preview_port, *video_port, *still_port;
 
-    if (!CameraObj)
+    if (!RpiCamera)
         // Camera object needs to be initialized first
         goto error;
 
-    camera = CameraObj->camera;
+    camera = RpiCamera->camera;
 
     status = mmal_component_create(MMAL_COMPONENT_DEFAULT_CAMERA, &camera);
 
@@ -101,8 +104,8 @@ MMAL_STATUS_T __setup_camera(Camera *CameraObj){
       MMAL_PARAMETER_CAMERA_CONFIG_T cam_config =
         {
             {MMAL_PARAMETER_CAMERA_CONFIG, sizeof(cam_config)},
-            .max_stills_w = DEFAULT_STILLS_WIDTH,
-            .max_stills_h = DEFAULT_STILLS_HEIGHT,
+            .max_stills_w = DEFAULT_STILLS_MAX_WIDTH,
+            .max_stills_h = DEFAULT_STILLS_MAX_HEIGHT,
             .stills_yuv422 = 0,
             .one_shot_stills = 1,
             .max_preview_video_w = DEFAULT_PREVIEW_WIDTH,
@@ -170,12 +173,12 @@ MMAL_STATUS_T __setup_camera(Camera *CameraObj){
     format->encoding = MMAL_ENCODING_I420;
     format->encoding_variant = MMAL_ENCODING_I420;
     
-    format->es->video.width = DEFAULT_STILLS_WIDTH;
-    format->es->video.height = DEFAULT_STILLS_HEIGHT;
-    format->es->video.crop.x = 0;
-    format->es->video.crop.y = 0;
-    format->es->video.crop.width = DEFAULT_STILLS_WIDTH;
-    format->es->video.crop.height = DEFAULT_STILLS_HEIGHT;
+    format->es->video.width = DEFAULT_STILLS_MAX_WIDTH;
+    format->es->video.height = DEFAULT_STILLS_MAX_HEIGHT;
+    format->es->video.crop.x = DEFAULT_STILLS_CROP_X_OFFSET;
+    format->es->video.crop.y = DEFAULT_STILLS_CROP_Y_OFFSET;
+    format->es->video.crop.width = DEFAULT_STILLS_CROP_WIDTH;
+    format->es->video.crop.height = DEFAULT_STILLS_CROP_HEIGHT;
     format->es->video.frame_rate.num = DEFAULT_STILLS_FRAME_RATE_NUM;
     format->es->video.frame_rate.den = DEFAULT_STILLS_FRAME_RATE_DEN;
 
@@ -201,7 +204,7 @@ MMAL_STATUS_T __setup_camera(Camera *CameraObj){
       goto error;
     }
     
-    CameraObj->camera = camera;
+    RpiCamera->camera = camera;
 
     return status;
 
@@ -216,16 +219,18 @@ error:
 
 // New, Init, dealloc prototypes
 static PyObject *
-Camera_new(PyTypeObject *type, PyObject *args, PyObject *kwds){
+RpiCamera_new(PyTypeObject *type, PyObject *args, PyObject *kwds){
 
-    Camera *self;
-    npy_intp img_dims[3] = {0, 0, 0};
+    RpiCamera *self;
+    // npy_intp *img_dims[3] = {0, 0, 0};
+    int img_dim = 0;
 
-    self = (Camera *)type->tp_alloc(type, 0);
+    self = (RpiCamera *)type->tp_alloc(type, 0);
     if (self == NULL)
         return (PyObject *)self;
     
-    self->image = PyArray_SimpleNew(2, &img_dims, NPY_USHORT);
+    // self->image = PyArray_SimpleNew(2, img_dims, NPY_UINT8);
+    self->image = PyArray_FromDims(1, &img_dim, NPY_UINT8);
     Py_INCREF(self->image);
 
     //Take ownership & attach a logger
@@ -235,7 +240,7 @@ Camera_new(PyTypeObject *type, PyObject *args, PyObject *kwds){
 
     if(logging_module != NULL){
         logger = PyObject_CallMethodObjArgs(logging_module, PyUnicode_FromString("getLogger"),
-            PyUnicode_FromString("RpiCamera"), NULL);
+            PyUnicode_FromString("RpiRpiCamera"), NULL);
 
         PyObject_CallMethod(logger, PyUnicode_FromString("setLevel"), 
             PyUnicode_FromString("INFO"), NULL);
@@ -254,7 +259,7 @@ Camera_new(PyTypeObject *type, PyObject *args, PyObject *kwds){
 
 
 static int 
-Camera_init(Camera *self, PyObject *args, PyObject *kwds){
+RpiCamera_init(RpiCamera *self, PyObject *args, PyObject *kwds){
 
     MMAL_STATUS_T status;
     MMAL_ES_FORMAT_T *format;
@@ -264,6 +269,9 @@ Camera_init(Camera *self, PyObject *args, PyObject *kwds){
     if (status != MMAL_SUCCESS)
         return (int)status;
 
+    self->output_port = self->camera->output[MMAL_CAMERA_CAPTURE_PORT];
+    self->pool = mmal_port_pool_create(self->output_port, self->output_port->buffer_num, self->output_port->buffer_size);
+
     // self->camera_preview_port = self->camera->output[MMAL_CAMERA_PREVIEW_PORT];
     // self->camera_video_port = self->camera->output[MMAL_CAMERA_VIDEO_PORT];
     // self->camera_still_port = self->camera->output[MMAL_CAMERA_CAPTURE_PORT];
@@ -272,12 +280,15 @@ Camera_init(Camera *self, PyObject *args, PyObject *kwds){
 }
 
 static void 
-Camera_dealloc (Camera *self){
+RpiCamera_dealloc (RpiCamera *self){
 
     Py_XDECREF(self->image);
 
     if (self->camera)
         mmal_component_destroy(self->camera);
+
+    if (self->pool)
+        mmal_pool_destroy(self->pool);
 
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
@@ -286,14 +297,14 @@ Camera_dealloc (Camera *self){
 
 */
 static PyObject *
-Camera_get_image(Camera *self, void *closure){
+RpiCamera_get_image(RpiCamera *self, void *closure){
 
     Py_INCREF(self->image);
     return self->image;
 }
 
 static PyObject *
-Camera_get_camera_setting(Camera *self, void *closure){
+RpiCamera_get_camera_setting(RpiCamera *self, void *closure){
 
     int32_t param = (int32_t)closure;
     int32_t value;
@@ -369,7 +380,7 @@ Camera_get_camera_setting(Camera *self, void *closure){
 }
 
 static int
-Camera_set_camera_setting(Camera *self, PyObject *py_value, void *closure){
+RpiCamera_set_camera_setting(RpiCamera *self, PyObject *py_value, void *closure){
 
     int32_t param = (int32_t)closure;
     int32_t value;
@@ -432,14 +443,14 @@ Camera_set_camera_setting(Camera *self, PyObject *py_value, void *closure){
     }
 
     if (status != MMAL_SUCCESS){
-        PyErr_SetString(PyExc_RuntimeError, mmal_status_to_string(status));
+        PyErr_SetString(PyExc_RuntimeError, (char *)mmal_status_to_string(status));
         return -1;
     }
 
     return 0;
 }
 static PyObject *
-Camera_get_camera_settings(Camera *self, void *closure){
+RpiCamera_get_camera_settings(RpiCamera *self, void *closure){
 
     PyObject *settings = PyDict_New();
     if (!settings)

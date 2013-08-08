@@ -1,4 +1,4 @@
-#include "camera_settings.h"
+#include "RpiCamera_settings.h"
 #include "interface/mmal/util/mmal_util_params.h"
 
 MMAL_STATUS_T get_camera_saturation(MMAL_COMPONENT_T *camera,  int32_t *value){
