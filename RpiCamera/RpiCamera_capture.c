@@ -43,6 +43,7 @@ static void camera_output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buff
 	       	pData->bytes_written += buffer_length;
 			
 			mmal_buffer_header_mem_unlock(buffer);
+			fprintf(stderr, "Buffer freed\n");
       	}
 
 		// Check end of frame or error
@@ -85,10 +86,6 @@ PyObject *RpiCamera_capture_stills(RpiCamera *self, PyObject *arg, PyObject *kwd
 	MMAL_ES_FORMAT_T *format = self->output_port->format;
 	MMAL_BUFFER_HEADER_T *pool_buffer;
 
-	PyArrayObject *img = (PyArrayObject *)self->image;
-	npy_intp img_size = PyArray_Size(self->image);
-	fprintf(stderr, "IMGSIZE:  %d\n", (uint32_t)img_size);
-
 	STILL_CAPTURE_USERDATA_T callback_data;
    	VCOS_STATUS_T vcos_status = VCOS_SUCCESS;
 
@@ -103,7 +100,7 @@ PyObject *RpiCamera_capture_stills(RpiCamera *self, PyObject *arg, PyObject *kwd
 		return NULL;
 
 	//Clear image object
-	PyArray_FILLWBYTE(img, 0);
+	PyArray_FILLWBYTE((PyArrayObject *)self->image, 0);
 
 
 	//Setup callback data structure
@@ -111,8 +108,8 @@ PyObject *RpiCamera_capture_stills(RpiCamera *self, PyObject *arg, PyObject *kwd
 	callback_data.bytes_written = 0;
 
 
-	callback_data.image_size = (uint32_t) img_size;
-	callback_data.image_data = (uint8_t *) PyArray_GETPTR1(img, 0);
+	callback_data.image_size = (uint32_t) PyArray_Size(self->image);
+	callback_data.image_data = (uint8_t *) PyArray_GETPTR1((PyArrayObject *)self->image, 0);
 
 	vcos_status = vcos_semaphore_create(&callback_data.complete_semaphore, "RpiCamera-sem", 0);
 	vcos_assert(vcos_status == VCOS_SUCCESS);
@@ -171,22 +168,19 @@ int check_resize_image_buffer(RpiCamera *RpiCamera){
 	PyArrayObject *new_array=NULL;
 
 
-	int32_t format_shape[2];
-	npy_intp *image_shape = NULL;
-	int new_image_shape;
+	int32_t format_size = format->es->video.crop.height * format->es->video.crop.width;
+	const int32_t  image_size = PyArray_Size(RpiCamera->image);
 
-	int32_t  format_dim, image_dim;
-	char require_resize = 0;
-	uint8_t dim;
+	uint8_t require_resize = 0;
 
 	switch(format->encoding){
 		// 24bit RGB output 
 		case MMAL_ENCODING_BGR24:
-			format_dim = 3;
+			format_size *= 3;
 			break;
 
 		case MMAL_ENCODING_I420:
-			format_dim = 2;
+			format_size *= 1.5;
 			break;
 		
 		default:
@@ -194,62 +188,50 @@ int check_resize_image_buffer(RpiCamera *RpiCamera){
 			return -1;
 	}
 
-	format_shape[0] = format->es->video.crop.height;
-	format_shape[1] = format->es->video.crop.width;
+
 
 	if(!image_array){
+		fprintf(stderr, "Null image buffer, forcing resize.\n");
 		require_resize = 1;
 	}
-	else {
-
-		image_dim = PyArray_NDIM(image_array);
-		image_shape = PyArray_DIMS(image_array);
-
-		if (image_dim != format_dim)
-			require_resize = 1;
-		
-		else {
-			for(dim=0; dim<image_dim; dim++){
-				if (image_shape[dim] != format_shape[dim]){
-					require_resize = 1;
-					break;
-				}
-			}
-		}
-
+	else if (format_size != image_size){
+		fprintf(stderr, "Buffer size change:  old:  %d, new:  %d\n", image_size, format_size);
+		require_resize = 1;
 	}
 
+
 	if (require_resize != 0){
+		fprintf(stderr, "Resizing buffer\n");
+		// switch(format->encoding){
+		// 	case MMAL_ENCODING_BGR24:
+		// 		new_image_shape = 3 * format_shape[0] * format_shape[1];
+		// 		break;
 
-		switch(format->encoding){
-			case MMAL_ENCODING_BGR24:
-				new_image_shape = 3 * format_shape[0] * format_shape[1];
-				break;
-
-			case MMAL_ENCODING_I420:
-				new_image_shape = format_shape[0] * format_shape[1] * 1.5;
-				// new_image_shape[2] = 0;
-				break;
+		// 	case MMAL_ENCODING_I420:
+		// 		new_image_shape = format_shape[0] * format_shape[1] * 1.5;
+		// 		// new_image_shape[2] = 0;
+		// 		break;
 			
-			default:
-				PyErr_Format(PyExc_RuntimeError, "THIS IS A BUG; should be caught earlier.");
-				return -1;
-		}
+		// 	default:
+		// 		PyErr_Format(PyExc_RuntimeError, "THIS IS A BUG; should be caught earlier.");
+		// 		return -1;
+		// }
 
-		new_array = PyArray_FromDims(1, &new_image_shape, NPY_UINT8);
+		new_array = PyArray_FromDims(1, (int *)&format_size, NPY_UINT8);
 
 		if (!new_array){
 			PyErr_SetString(PyExc_RuntimeError, "Problem creating new array...");
 			return -1;
 		}
-		RpiCamera->image = (PyObject *)new_array; //
-		Py_INCREF(RpiCamera->image);
-		
-		if(image_array){
-			fprintf(stderr, "Decref old array\n");
-			Py_DECREF(image_array);
-		}
 
+		Py_INCREF(new_array);
+		RpiCamera->image = (PyObject *)new_array; //
+		
+		Py_XDECREF(image_array);
+		
+	}
+	else{
+		fprintf(stderr, "No buffer resizing required\n");
 	}
 	return 0;
 }
