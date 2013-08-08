@@ -11,6 +11,8 @@
 #include "RpiCamera_types.h"
 #include "RpiCamera_settings.h"
 #include "RpiCamera_capture.h"
+#include "RpiCamera_logging.h"
+PyObject *RPICAMERA_MODULE_LOGGER=NULL;
 
 static PyMethodDef RpiCamera_methods[] = {
     {"capture_still_frames", (PyCFunctionWithKeywords)RpiCamera_capture_stills, METH_VARARGS | METH_KEYWORDS,
@@ -113,6 +115,8 @@ PyInit_RpiCamera(void){
 
     //Import logging module
     PyObject *logging_module = PyImport_ImportModule("logging");
+    RPICAMERA_MODULE_LOGGER = PyObject_CallMethod(logging_module, "getLogger", "s", "RpiCamera");
+    Py_INCREF(RPICAMERA_MODULE_LOGGER);
 
     //Create our own module
     PyObject *m = PyModule_Create(&RpiCameraModule);
@@ -122,7 +126,7 @@ PyInit_RpiCamera(void){
 
     //Add Camera Object
     PyModule_AddObject(m, "Camera", (PyObject *)&RpiCameraType);
-
+    PyModule_AddObject(m, "logger", RPICAMERA_MODULE_LOGGER);
 
     //Initialize BCM host board 
     bcm_host_init();

@@ -165,7 +165,7 @@ int check_resize_image_buffer(RpiCamera *RpiCamera){
 
 	MMAL_ES_FORMAT_T *format = RpiCamera->output_port->format;
 	PyArrayObject *image_array = (PyArrayObject *)RpiCamera->image;
-	PyArrayObject *new_array=NULL;
+	PyObject *new_array=NULL;
 
 
 	int32_t format_size = format->es->video.crop.height * format->es->video.crop.width;
@@ -225,7 +225,7 @@ int check_resize_image_buffer(RpiCamera *RpiCamera){
 		}
 
 		Py_INCREF(new_array);
-		RpiCamera->image = (PyObject *)new_array; //
+		RpiCamera->image = new_array; //
 		
 		Py_XDECREF(image_array);
 		

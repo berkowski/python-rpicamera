@@ -9,7 +9,8 @@ RpiCamera = Extension('RpiCamera',
     library_dirs=['/opt/vc/lib'],
     sources=['RpiCamera/RpiCamera.c',
               'RpiCamera/RpiCamera_settings.c',
-              'RpiCamera/RpiCamera_capture.c'])
+              'RpiCamera/RpiCamera_capture.c',
+              'RpiCamera/RpiCamera_logging.c'])
 
 
 setup (name = 'RpiCamera',
