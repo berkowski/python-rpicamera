@@ -12,8 +12,14 @@
 #include "RpiCamera_logging.h"
 PyObject *RPICAMERA_MODULE_LOGGER=NULL;
 
+static PyObject *RpiCamera_set_output_format(RpiCamera *self, PyObject *args, PyObject *kwds);
+static PyObject *RpiCamera_get_output_format(RpiCamera *self, PyObject *args, PyObject *kwds);
 
 static PyMethodDef RpiCamera_methods[] = {
+    {"set_output_format", (PyCFunctionWithKeywords)RpiCamera_set_output_format, METH_VARARGS | METH_KEYWORDS,
+        NULL},
+    {"get_output_format", (PyCFunctionWithKeywords)RpiCamera_get_output_format, METH_VARARGS | METH_KEYWORDS,
+        NULL},
     {"capture_still_frames", (PyCFunctionWithKeywords)RpiCamera_capture_stills, METH_VARARGS | METH_KEYWORDS,
         "Capture still frame(s) using the currently loaded format."},
     {NULL, NULL, NULL, NULL}
@@ -42,6 +48,8 @@ static PyGetSetDef RpiCamera_getseters[] = {
     {"exposure_mode", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor exposure mode", (void *) MMAL_PARAMETER_EXPOSURE_MODE},
     {"awb_mode", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor automatic white-balance mode", (void *) MMAL_PARAMETER_AWB_MODE},
     {"image_fx", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Sensor image effects", (void *) MMAL_PARAMETER_IMAGE_EFFECT},
+    {"flash_mode", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Camera flash mode", (void *) MMAL_PARAMETER_FLASH},
+    {"flash_type", (getter)RpiCamera_get_camera_setting, (setter)RpiCamera_set_camera_setting, "Camera flash type", (void *) MMAL_PARAMETER_FLASH_SELECT},
     {NULL}
 };
 

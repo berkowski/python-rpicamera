@@ -173,24 +173,15 @@ MMAL_STATUS_T __setup_camera(RpiCamera *RpiCamera){
     format->encoding = MMAL_ENCODING_I420;
     format->encoding_variant = MMAL_ENCODING_I420;
     
-    // format->es->video.width = DEFAULT_STILLS_MAX_WIDTH;
-    // format->es->video.height = DEFAULT_STILLS_MAX_HEIGHT;
-    // format->es->video.crop.x = DEFAULT_STILLS_CROP_X_OFFSET;
-    // format->es->video.crop.y = DEFAULT_STILLS_CROP_Y_OFFSET;
-    // format->es->video.crop.width = DEFAULT_STILLS_CROP_WIDTH;
-    // format->es->video.crop.height = DEFAULT_STILLS_CROP_HEIGHT;
-    // format->es->video.frame_rate.num = DEFAULT_STILLS_FRAME_RATE_NUM;
-    // format->es->video.frame_rate.den = DEFAULT_STILLS_FRAME_RATE_DEN;
+    format->es->video.width = DEFAULT_STILLS_MAX_WIDTH;
+    format->es->video.height = DEFAULT_STILLS_MAX_HEIGHT;
+    format->es->video.crop.x = DEFAULT_STILLS_CROP_X_OFFSET;
+    format->es->video.crop.y = DEFAULT_STILLS_CROP_Y_OFFSET;
+    format->es->video.crop.width = DEFAULT_STILLS_CROP_WIDTH;
+    format->es->video.crop.height = DEFAULT_STILLS_CROP_HEIGHT;
+    format->es->video.frame_rate.num = DEFAULT_STILLS_FRAME_RATE_NUM;
+    format->es->video.frame_rate.den = DEFAULT_STILLS_FRAME_RATE_DEN;
     
-    format->es->video.width = 320;
-    format->es->video.height = 240;
-    format->es->video.crop.x = 0, //DEFAULT_STILLS_CROP_X_OFFSET;
-    format->es->video.crop.y = 0, //DEFAULT_STILLS_CROP_Y_OFFSET;
-    format->es->video.crop.width = 320;
-    format->es->video.crop.height = 240;
-    format->es->video.frame_rate.num = 90;
-    format->es->video.frame_rate.den = 1;
-
     if (still_port->buffer_size < still_port->buffer_size_min)
       still_port->buffer_size = still_port->buffer_size_min;
 
@@ -238,29 +229,9 @@ RpiCamera_new(PyTypeObject *type, PyObject *args, PyObject *kwds){
     if (self == NULL)
         return (PyObject *)self;
     
-    // self->image = PyArray_SimpleNew(2, img_dims, NPY_UINT8);
     self->image = PyArray_FromDims(1, &img_dim, NPY_UINT8);
     Py_INCREF(self->image);
-
-    //Take ownership & attach a logger
-/*
-    PyObject *logging_module = PyImport_AddModule("logging");
-    PyObject *logger = NULL;
-
-    if(logging_module != NULL){
-        logger = PyObject_CallMethodObjArgs(logging_module, PyUnicode_FromString("getLogger"),
-            PyUnicode_FromString("RpiRpiCamera"), NULL);
-
-        PyObject_CallMethod(logger, PyUnicode_FromString("setLevel"), 
-            PyUnicode_FromString("INFO"), NULL);
-
-        Py_INCREF(logger);
-    }
-    
-    self->logger = logger;
-*/
-    
-
+  
     return (PyObject *)self;
 
 }
@@ -280,10 +251,6 @@ RpiCamera_init(RpiCamera *self, PyObject *args, PyObject *kwds){
 
     self->output_port = self->camera->output[MMAL_CAMERA_CAPTURE_PORT];
     self->pool = mmal_port_pool_create(self->output_port, self->output_port->buffer_num, self->output_port->buffer_size);
-
-    // self->camera_preview_port = self->camera->output[MMAL_CAMERA_PREVIEW_PORT];
-    // self->camera_video_port = self->camera->output[MMAL_CAMERA_VIDEO_PORT];
-    // self->camera_still_port = self->camera->output[MMAL_CAMERA_CAPTURE_PORT];
 
     return 0;
 }
@@ -313,12 +280,162 @@ RpiCamera_get_image(RpiCamera *self, void *closure){
 }
 
 static PyObject *
+RpiCamera_set_output_format(RpiCamera *self, PyObject *args, PyObject *kwds){
+
+    static char *kwlist[] = {"channel", "width", "height", "width_offset", "height_offset",
+                             "crop_width", "crop_height", "frame_rate_num", "frame_rate_den", 
+                             "encoding", NULL};
+
+    uint8_t channel = MMAL_CAMERA_CAPTURE_PORT;
+    uint32_t width = DEFAULT_STILLS_MAX_WIDTH;
+    uint32_t height = DEFAULT_STILLS_MAX_HEIGHT;
+    uint32_t width_offset = 0;
+    uint32_t height_offset = 0;
+    uint32_t crop_width = 0;
+    uint32_t crop_height = 0;
+    uint32_t frame_rate_num = 15;
+    uint32_t frame_rate_den = 1;
+    uint32_t encoding = MMAL_ENCODING_I420;
+
+
+    MMAL_ES_FORMAT_T *format;
+    MMAL_PORT_T *port;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|BIIIIIIIII", kwlist, &channel, &width, 
+                                        &height, &width_offset, &height_offset, &crop_width, 
+                                        &crop_height, &frame_rate_num, &frame_rate_den, &encoding))
+        return NULL;
+
+
+    if (!crop_width)
+        crop_width = width - width_offset;
+
+    if (!crop_height)
+        crop_height = height - height_offset;
+
+
+    if ((channel < 0) || (channel > 2)){
+        PyErr_Format(PyExc_ValueError, "Invalid output channel, choose 0, 1, or 2");
+        return NULL;
+    }
+
+    if (width > DEFAULT_STILLS_MAX_WIDTH){
+        PyErr_Format(PyExc_ValueError, "Width exceeded maximum allowed (%d > %d)", width, DEFAULT_STILLS_MAX_WIDTH);
+        return NULL;
+    }
+
+    if (height > DEFAULT_STILLS_MAX_HEIGHT){
+        PyErr_Format(PyExc_ValueError, "Height exceeded maximum allowed (%d > %d)", height, DEFAULT_STILLS_MAX_HEIGHT);
+        return NULL;
+    }
+
+    if (crop_width + width_offset > width){
+        PyErr_Format(PyExc_ValueError, "Crop width + offset exceeded maximum allowed (%d > %d)", crop_width + width_offset, width);
+        return NULL;
+    }
+
+    if (crop_height + height_offset > DEFAULT_STILLS_MAX_HEIGHT){
+        PyErr_Format(PyExc_ValueError, "Crop height + offset exceeded maximum allowed (%d > %d)", crop_height + height_offset, height);
+        return NULL;
+    }
+
+
+    if (crop_width + width_offset > width){
+        PyErr_Format(PyExc_ValueError, "Crop Height exceeded maximum allowed (%d > %d)", crop_width + width_offset, width);
+        return NULL;        
+    }
+
+    switch (encoding){
+        case MMAL_ENCODING_I420:
+        case MMAL_ENCODING_RGB24:
+            break;
+
+        default:
+            PyErr_Format(PyExc_ValueError, "Unsupported encoding id:  %d", encoding);
+            return NULL;
+    }
+
+    port = self->camera->output[channel];
+    format = port->format;
+
+    format->encoding = encoding;
+    format->encoding_variant = encoding;
+
+    format->es->video.width = (uint32_t)width;
+    format->es->video.height = (uint32_t)height;
+    format->es->video.crop.x = (int32_t)width_offset;
+    format->es->video.crop.y = (int32_t)height_offset;
+    format->es->video.crop.width = (int32_t)crop_width;
+    format->es->video.crop.height = (int32_t)crop_height;
+    format->es->video.frame_rate.num = (int32_t)frame_rate_num;
+    format->es->video.frame_rate.den = (int32_t)frame_rate_den;
+
+    if (port->buffer_size < port->buffer_size_min)
+      port->buffer_size = port->buffer_size_min;
+
+    port->buffer_num = port->buffer_num_recommended;
+
+    if(mmal_port_format_commit(port) != MMAL_SUCCESS){
+        PyErr_SetString(PyExc_RuntimeError, "Unable to commit format to camera output port");
+        return NULL;
+    }
+    
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+RpiCamera_get_output_format(RpiCamera *self, PyObject *args, PyObject *kwds){
+
+    static char *kwlist[] = {"channel", NULL};
+    uint8_t channel = MMAL_CAMERA_CAPTURE_PORT;
+    int8_t status = 0;
+    MMAL_ES_FORMAT_T *format;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|B", kwlist, &channel))
+        return NULL;
+
+    if ((channel < 0) || (channel > 2)){
+        PyErr_Format(PyExc_ValueError, "Invalid output channel, choose 0, 1, or 2");
+        return NULL;
+    }
+
+    PyObject *d = PyDict_New();
+
+    if (!d){
+        PyErr_Format(PyExc_RuntimeError, "Unable to create format dictionary object");
+        return NULL;
+    }
+    
+    format = self->camera->output[channel]->format;
+
+    status |= PyDict_SetItemString(d, "width", PyLong_FromUnsignedLong((unsigned long)format->es->video.width));
+    status |= PyDict_SetItemString(d, "height", PyLong_FromUnsignedLong((unsigned long)format->es->video.height));
+    status |= PyDict_SetItemString(d, "width_offset", PyLong_FromUnsignedLong((unsigned long)format->es->video.crop.x));
+    status |= PyDict_SetItemString(d, "height_offset", PyLong_FromUnsignedLong((unsigned long)format->es->video.crop.y));
+    status |= PyDict_SetItemString(d, "crop_width", PyLong_FromUnsignedLong((unsigned long)format->es->video.crop.width));
+    status |= PyDict_SetItemString(d, "crop_height", PyLong_FromUnsignedLong((unsigned long)format->es->video.crop.height));
+    status |= PyDict_SetItemString(d, "frame_rate_num", PyLong_FromUnsignedLong((unsigned long)format->es->video.frame_rate.num));
+    status |= PyDict_SetItemString(d, "frame_rate_den", PyLong_FromUnsignedLong((unsigned long)format->es->video.frame_rate.den));
+    status |= PyDict_SetItemString(d, "encoding", PyLong_FromUnsignedLong((unsigned long)format->encoding));
+
+    if(status){
+        PyErr_Format(PyExc_RuntimeError, "Unable to populate format dictionary");
+        return NULL;        
+    }
+    Py_INCREF(d);
+    return d;
+}
+
+static PyObject *
 RpiCamera_get_camera_setting(RpiCamera *self, void *closure){
 
     int32_t param = (int32_t)closure;
     int32_t value;
-    PyObject *result;
+    uint8_t k;
 
+    PyObject *result, *dict, *tuple;
+
+    MMAL_PARAMETER_CAMERA_INFO_T cam_info;
     MMAL_STATUS_T status;
 
     switch(param){
@@ -377,10 +494,53 @@ RpiCamera_get_camera_setting(RpiCamera *self, void *closure){
             result = PyLong_FromLong((long)value);
             break;
 
+        case MMAL_PARAMETER_FLASH:
+            status = get_camera_flash_mode(self->camera, (MMAL_PARAM_FLASH_T *)&value);
+            result = PyLong_FromLong((long)value);
+            break;
+
+        case MMAL_PARAMETER_FLASH_SELECT:
+            status = get_camera_flash_type(self->camera, (MMAL_PARAMETER_CAMERA_INFO_FLASH_TYPE_T *)&value);
+            result = PyLong_FromLong((long)value);
+            break;
+
+        // case MMAL_PARAMETER_CAMERA_INFO:
+        //     status = get_camera_info(self->camera, &cam_info);
+        //     if (status != MMAL_SUCCESS){
+        //         PyErr_SetString(PyExc_RuntimeError, "Unable to get camera info");
+        //         break;
+        //     }
+
+            
+        //     tuple = PyTuple_New((Py_ssize_t) cam_info.num_cameras);
+        //     result = PyDict_New();
+
+        //     for (k=0; k<cam_info.num_cameras; k++){
+        //         dict = PyDict_New();
+
+        //         PyDict_SetItemString(dict, "port_id", PyLong_FromUnsignedLong((unsigned long)cam_info.cameras[k].port_id));
+        //         PyDict_SetItemString(dict, "max_height", PyLong_FromUnsignedLong((unsigned long)cam_info.cameras[k].max_height));
+        //         PyDict_SetItemString(dict, "max_width", PyLong_FromUnsignedLong((unsigned long)cam_info.cameras[k].max_width));
+        //         PyDict_SetItemString(dict, "lens_present", PyBool_FromLong((long)cam_info.cameras[k].lens_present));
+
+        //         PyTuple_SetItem(tuple, (Py_ssize_t)k, dict);
+        //         Py_INCREF(dict);
+        //     }
+
+        //     PyDict_SetItemString(result, "cameras", tuple);
+        //     tuple = PyTuple_New((Py_ssize_t) cam_info.num_flashes);
+            
+        //     for (k=0; k<cam_info.num_flashes; k++){
+        //         dict = PyLong_FromUnsignedLong((unsigned long) cam_info.flashes[k].flash_type);
+        //         PyTuple_SetItem(tuple, (Py_ssize_t)k, dict);
+        //     }            
+
+        //     PyDict_SetItemString(result, "flashes", tuple);
+        //     break;
     }
 
     if (status != MMAL_SUCCESS){
-        //do some error handling
+        PyErr_SetString(PyExc_AttributeError, "Unable to read attribute from camera");
         return NULL;
     }
 
@@ -447,6 +607,14 @@ RpiCamera_set_camera_setting(RpiCamera *self, PyObject *py_value, void *closure)
 
         case MMAL_PARAMETER_IMAGE_EFFECT:
             status = set_camera_image_fx(self->camera, (MMAL_PARAM_IMAGEFX_T)value);
+            break;
+
+        case MMAL_PARAMETER_FLASH:
+            status = set_camera_flash_mode(self->camera, (MMAL_PARAMETER_CAMERA_INFO_FLASH_TYPE_T)value);
+            break;
+
+        case MMAL_PARAMETER_FLASH_SELECT:
+            status = set_camera_flash_type(self->camera, (MMAL_PARAM_FLASH_T)value);
             break;
 
     }

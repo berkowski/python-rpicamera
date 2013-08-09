@@ -145,6 +145,7 @@ PyObject *RpiCamera_capture_stills(RpiCamera *self, PyObject *arg, PyObject *kwd
 
 	self->output_port->userdata = (struct MMAL_PORT_USERDATA_T *)&callback_data;
 	status = mmal_port_enable(self->output_port, camera_output_callback);
+	
 	if (status != MMAL_SUCCESS){
 		PyErr_SetString(PyExc_RuntimeError, "Could not enable output port");
 		return NULL;
@@ -203,7 +204,7 @@ int check_resize_image_buffer(RpiCamera *RpiCamera){
 	PyObject *new_array=NULL;
 
 
-	int32_t format_size = format->es->video.crop.height * format->es->video.crop.width;
+	int32_t format_size = format->es->video.height * format->es->video.width;
 	const int32_t  image_size = PyArray_Size(RpiCamera->image);
 
 	uint8_t require_resize = 0;

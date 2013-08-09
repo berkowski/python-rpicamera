@@ -16,6 +16,9 @@ MMAL_STATUS_T get_camera_image_fx(MMAL_COMPONENT_T *camera, MMAL_PARAM_IMAGEFX_T
 MMAL_STATUS_T get_camera_colour_fx(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_COLOURFX_T *value);
 MMAL_STATUS_T get_camera_rotation(MMAL_COMPONENT_T *camera, int32_t *value);
 MMAL_STATUS_T get_camera_flips(MMAL_COMPONENT_T *camera, MMAL_PARAM_MIRROR_T *value);
+// MMAL_STATUS_T get_camera_info(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_CAMERA_INFO_T *value);
+MMAL_STATUS_T get_camera_flash_mode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLASH_T *value);
+MMAL_STATUS_T get_camera_flash_type(MMAL_COMPONENT_T *camera,  MMAL_PARAMETER_CAMERA_INFO_FLASH_TYPE_T *value);
 
 MMAL_STATUS_T set_camera_saturation(MMAL_COMPONENT_T *camera,  int32_t value);
 MMAL_STATUS_T set_camera_sharpness(MMAL_COMPONENT_T *camera, int32_t value);
@@ -31,5 +34,7 @@ MMAL_STATUS_T set_camera_image_fx(MMAL_COMPONENT_T *camera, MMAL_PARAM_IMAGEFX_T
 MMAL_STATUS_T set_camera_colour_fx(MMAL_COMPONENT_T *camera, const MMAL_PARAMETER_COLOURFX_T *value);
 MMAL_STATUS_T set_camera_rotation(MMAL_COMPONENT_T *camera, int32_t value);
 MMAL_STATUS_T set_camera_flips(MMAL_COMPONENT_T *camera, MMAL_PARAM_MIRROR_T value);
-
+// MMAL_STATUS_T set_camera_info(MMAL_COMPONENT_T *camera, const MMAL_PARAMETER_CAMERA_INFO_T *value);
+MMAL_STATUS_T set_camera_flash_mode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLASH_T value);
+MMAL_STATUS_T set_camera_flash_type(MMAL_COMPONENT_T *camera,  MMAL_PARAMETER_CAMERA_INFO_FLASH_TYPE_T value);
 #endif

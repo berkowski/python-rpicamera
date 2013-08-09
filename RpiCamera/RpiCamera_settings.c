@@ -158,6 +158,39 @@ MMAL_STATUS_T get_camera_flips(MMAL_COMPONENT_T *camera, MMAL_PARAM_MIRROR_T *va
 	return status;
 }
 
+MMAL_STATUS_T get_camera_flash_mode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLASH_T *value){
+	if (!camera)
+		return MMAL_ENOTREADY;
+
+	MMAL_PARAMETER_FLASH_T param = {{MMAL_PARAMETER_FLASH, sizeof(param)},
+											0};
+	MMAL_STATUS_T  status;
+	status =  mmal_port_parameter_get(camera->control, &param.hdr);
+	*value = param.value;
+
+	return status;
+}
+
+MMAL_STATUS_T get_camera_flash_type(MMAL_COMPONENT_T *camera,  MMAL_PARAMETER_CAMERA_INFO_FLASH_TYPE_T *value){
+	if (!camera)
+		return MMAL_ENOTREADY;
+
+	MMAL_PARAMETER_FLASH_SELECT_T param = {{MMAL_PARAMETER_FLASH_SELECT , sizeof(param)},
+											0};
+	MMAL_STATUS_T  status;
+	status =  mmal_port_parameter_get(camera->control, &param.hdr);
+	*value = param.flash_type;
+
+	return status;
+}
+
+MMAL_STATUS_T get_camera_info(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_CAMERA_INFO_T *value){
+	if (!camera)
+		return MMAL_ENOTREADY;
+	
+	return mmal_port_parameter_get(camera->control, &(value->hdr));
+}
+
 MMAL_STATUS_T set_camera_saturation(MMAL_COMPONENT_T *camera,  int32_t value){
 	if (!camera)
 		return MMAL_ENOTREADY;
@@ -316,4 +349,30 @@ MMAL_STATUS_T set_camera_flips(MMAL_COMPONENT_T *camera, MMAL_PARAM_MIRROR_T val
 	}
 
 	return ret;
+}
+
+MMAL_STATUS_T set_camera_flash_mode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLASH_T value){
+	if (!camera)
+		return MMAL_ENOTREADY;
+
+	MMAL_PARAMETER_FLASH_T param = {{MMAL_PARAMETER_FLASH, sizeof(param)},
+											value};
+	return  mmal_port_parameter_set(camera->control, &param.hdr);
+
+}
+
+MMAL_STATUS_T set_camera_flash_type(MMAL_COMPONENT_T *camera,  MMAL_PARAMETER_CAMERA_INFO_FLASH_TYPE_T value){
+	if (!camera)
+		return MMAL_ENOTREADY;
+
+	MMAL_PARAMETER_FLASH_SELECT_T param = {{MMAL_PARAMETER_FLASH_SELECT, sizeof(param)},
+											value};
+	return mmal_port_parameter_set(camera->control, &param.hdr);
+
+}
+MMAL_STATUS_T set_camera_info(MMAL_COMPONENT_T *camera, const MMAL_PARAMETER_CAMERA_INFO_T *value){
+	if (!camera)
+		return MMAL_ENOTREADY;
+	
+	return mmal_port_parameter_set(camera->control, &(value->hdr));
 }
