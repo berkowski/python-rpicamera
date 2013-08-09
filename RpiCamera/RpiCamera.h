@@ -2,8 +2,6 @@
 #define RPICAMERA_H_
 
 #include <Python.h>
-// #include <structmember.h>
-// #define PY_ARRAY_UNIQUE_SYMBOL PyArray_API
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #define PY_ARRAY_UNIQUE_SYMBOL RPICAMERA_ARRAY_API
 #include <numpy/arrayobject.h>
@@ -13,6 +11,7 @@
 #include "RpiCamera_capture.h"
 #include "RpiCamera_logging.h"
 PyObject *RPICAMERA_MODULE_LOGGER=NULL;
+
 
 static PyMethodDef RpiCamera_methods[] = {
     {"capture_still_frames", (PyCFunctionWithKeywords)RpiCamera_capture_stills, METH_VARARGS | METH_KEYWORDS,

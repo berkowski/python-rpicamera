@@ -27,13 +27,11 @@ typedef struct {
 
     VCOS_SEMAPHORE_T complete_semaphore;
     MMAL_POOL_T *buffer_pool;
-    uint32_t num_frames;
     uint8_t shift;
     uint8_t *image_data;
-    uint8_t debug;
     uint32_t image_size;
     uint32_t bytes_written;
-
+    uint8_t debug;
 
 } STILL_CAPTURE_USERDATA_T;
 #endif

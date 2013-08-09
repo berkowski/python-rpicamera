@@ -33,7 +33,7 @@ void __camera_control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer){
     if (buffer->cmd == MMAL_EVENT_PARAMETER_CHANGED){
     }
     else{
-        // vcos_log_error("Received unexpected camera control callback event, 0x%08x", buffer->cmd);
+        rpicamera_log_error("Received unexpected camera control callback event, 0x%08x", buffer->cmd);
     }
 
     mmal_buffer_header_release(buffer);
@@ -80,13 +80,13 @@ MMAL_STATUS_T __setup_camera(RpiCamera *RpiCamera){
 
     if (status != MMAL_SUCCESS)
     {
-      // vcos_log_error("Failed to create camera component");
+      rpicamera_log_error("Failed to create camera component", NULL);
       goto error;
     }
 
     if (!camera->output_num)
     {
-      // vcos_log_error("Camera doesn't have output ports");
+      rpicamera_log_error("Camera doesn't have output ports", NULL);
       goto error;
     }
 
@@ -95,7 +95,7 @@ MMAL_STATUS_T __setup_camera(RpiCamera *RpiCamera){
 
     if (status)
     {
-      // vcos_log_error("Unable to enable control port : error %d", status);
+      rpicamera_log_error("Unable to enable control port : error %d", status);
       goto error;
     }
 
@@ -119,14 +119,14 @@ MMAL_STATUS_T __setup_camera(RpiCamera *RpiCamera){
     }
 
     if (status){
-        // vcos_log_error("Unable to set camera config");
+        rpicamera_log_error("Unable to set camera config", NULL);
         goto error;
     }
 
     status = __set_default_camera_parameters(camera);
 
     if (status){
-        // vcos_log_error("Unable to set default camera parameters");
+        rpicamera_log_error("Unable to set default camera parameters", NULL);
         goto error;
     }
 
@@ -149,7 +149,7 @@ MMAL_STATUS_T __setup_camera(RpiCamera *RpiCamera){
 
     if (status)
     {
-      // vcos_log_error("camera viewfinder format couldn't be set");
+      rpicamera_log_error("camera viewfinder format couldn't be set", NULL);
       goto error;
     }
 
@@ -159,7 +159,7 @@ MMAL_STATUS_T __setup_camera(RpiCamera *RpiCamera){
     status = mmal_port_format_commit(video_port);
 
     if (status){
-      // vcos_log_error("camera video format couldn't be set");
+      rpicamera_log_error("camera video format couldn't be set", NULL);
       goto error;
     }
 
@@ -173,14 +173,23 @@ MMAL_STATUS_T __setup_camera(RpiCamera *RpiCamera){
     format->encoding = MMAL_ENCODING_I420;
     format->encoding_variant = MMAL_ENCODING_I420;
     
-    format->es->video.width = DEFAULT_STILLS_MAX_WIDTH;
-    format->es->video.height = DEFAULT_STILLS_MAX_HEIGHT;
-    format->es->video.crop.x = DEFAULT_STILLS_CROP_X_OFFSET;
-    format->es->video.crop.y = DEFAULT_STILLS_CROP_Y_OFFSET;
-    format->es->video.crop.width = DEFAULT_STILLS_CROP_WIDTH;
-    format->es->video.crop.height = DEFAULT_STILLS_CROP_HEIGHT;
-    format->es->video.frame_rate.num = DEFAULT_STILLS_FRAME_RATE_NUM;
-    format->es->video.frame_rate.den = DEFAULT_STILLS_FRAME_RATE_DEN;
+    // format->es->video.width = DEFAULT_STILLS_MAX_WIDTH;
+    // format->es->video.height = DEFAULT_STILLS_MAX_HEIGHT;
+    // format->es->video.crop.x = DEFAULT_STILLS_CROP_X_OFFSET;
+    // format->es->video.crop.y = DEFAULT_STILLS_CROP_Y_OFFSET;
+    // format->es->video.crop.width = DEFAULT_STILLS_CROP_WIDTH;
+    // format->es->video.crop.height = DEFAULT_STILLS_CROP_HEIGHT;
+    // format->es->video.frame_rate.num = DEFAULT_STILLS_FRAME_RATE_NUM;
+    // format->es->video.frame_rate.den = DEFAULT_STILLS_FRAME_RATE_DEN;
+    
+    format->es->video.width = 320;
+    format->es->video.height = 240;
+    format->es->video.crop.x = 0, //DEFAULT_STILLS_CROP_X_OFFSET;
+    format->es->video.crop.y = 0, //DEFAULT_STILLS_CROP_Y_OFFSET;
+    format->es->video.crop.width = 320;
+    format->es->video.crop.height = 240;
+    format->es->video.frame_rate.num = 90;
+    format->es->video.frame_rate.den = 1;
 
     if (still_port->buffer_size < still_port->buffer_size_min)
       still_port->buffer_size = still_port->buffer_size_min;
@@ -191,7 +200,7 @@ MMAL_STATUS_T __setup_camera(RpiCamera *RpiCamera){
 
     if (status)
     {
-      // vcos_log_error("camera still format couldn't be set");
+      rpicamera_log_error("camera still format couldn't be set", NULL);
       goto error;
     }
 
@@ -200,7 +209,7 @@ MMAL_STATUS_T __setup_camera(RpiCamera *RpiCamera){
 
     if (status)
     {
-      // vcos_log_error("camera component couldn't be enabled");
+      rpicamera_log_error("camera component couldn't be enabled", NULL);
       goto error;
     }
     
