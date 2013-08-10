@@ -1,7 +1,9 @@
 #ifndef RPICAMERA_LOGGER_H_
 #define RPICAMERA_LOGGER_H_
 #include <Python.h>
+#include "interface/vcos/vcos_semaphore.h"
 
+// extern VCOS_SEMAPHORE_T *logging_semaphore;
 extern PyObject *RPICAMERA_MODULE_LOGGER;
 char RPICAMERA_MODULE_LOGGER_MSG[1024];
 

@@ -19,6 +19,7 @@ typedef struct {
     MMAL_POOL_T *pool;
 
     PyObject *image;
+    char debug_flag;
 
 } RpiCamera;
 
@@ -28,6 +29,7 @@ typedef struct {
     VCOS_SEMAPHORE_T complete_semaphore;
     MMAL_POOL_T *buffer_pool;
     uint8_t shift;
+    uint8_t in_progress;
     uint8_t *image_data;
     uint32_t image_size;
     uint32_t bytes_written;

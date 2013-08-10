@@ -14,39 +14,39 @@
 
 static void camera_output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
-	rpicamera_log_debug("Starting capture callback.", NULL);
    	STILL_CAPTURE_USERDATA_T *pData = (STILL_CAPTURE_USERDATA_T *)port->userdata;
 
 	int complete = 0;
 	int bytes_to_write = 0;
 	uint8_t *img_buffer, *data_buffer;
-
+	uint8_t capture_frame = 1;
 	uint32_t k;
 
 	// We pass our file handle and other stuff in via the userdata field.
-
+	bytes_to_write = buffer->length - buffer->offset;
 
    	if (pData){
-      	bytes_to_write = buffer->length - buffer->offset;
+      	if (pData->debug){
+      		rpicamera_log_debug("Buffer flags:  %0X", buffer->flags);
+      		rpicamera_log_debug("Buffer size:  %d, length: %d, offset: %d", bytes_to_write, buffer->length, buffer->offset);
+      	}
 
      	if (pData->bytes_written + bytes_to_write > pData->image_size){
      		rpicamera_log_warning("Possible overflow condition.", NULL);
-     		rpicamera_log_warning("MAXSIZE:  %d, BYTES_WRITTEN:  %d", pData->image_size, pData->bytes_written);
-     		rpicamera_log_warning("BYTES_WRITTEN:  %d", pData->bytes_written);
-     		rpicamera_log_warning("BUFFER_OFFSET:  %d", buffer->offset);
-     		rpicamera_log_warning("BUFFER_LENGTH:  %d", buffer->length);
+     		rpicamera_log_warning("  Image size:  %d, bytes already written:  %d", pData->image_size, pData->bytes_written);
+     		rpicamera_log_warning("  buffer size:  %d", buffer->length - buffer->offset);
      		bytes_to_write = pData->image_size - pData->bytes_written;
      		complete = 1;
      	}
 
-      	if (bytes_to_write){
+      	if (bytes_to_write > 0){
       		if (pData->debug)
       			rpicamera_log_debug("Locking buffer.", NULL);
 
 	       	mmal_buffer_header_mem_lock(buffer);
 	       	
 	       	if (pData->debug)
-				rpicamera_log_debug("writing %d bytes of data.", bytes_to_write);	       		
+				rpicamera_log_debug("writing %d bytes of data to %0x+%d", bytes_to_write, pData->image_data, pData->bytes_written);	       		
 
 			img_buffer = pData->image_data + pData->bytes_written;
 			data_buffer = buffer->data + buffer->offset;
@@ -94,6 +94,9 @@ static void camera_output_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buff
    	}
 
    	if (complete){
+   		if (pData->debug)
+   			rpicamera_log_debug("POSTing semaphore", NULL);
+
       	vcos_semaphore_post(&(pData->complete_semaphore));
    	}
 }
@@ -139,9 +142,11 @@ PyObject *RpiCamera_capture_stills(RpiCamera *self, PyObject *arg, PyObject *kwd
 
 	callback_data.image_size = (uint32_t) PyArray_Size(self->image);
 	callback_data.image_data = (uint8_t *) PyArray_GETPTR1((PyArrayObject *)self->image, 0);
+	callback_data.debug = (uint8_t)self->debug_flag;
+	callback_data.in_progress = 0;
 
 	vcos_status = vcos_semaphore_create(&callback_data.complete_semaphore, "RpiCamera-sem", 0);
-	vcos_assert(vcos_status == VCOS_SUCCESS);
+	// vcos_assert(vcos_status == VCOS_SUCCESS);
 
 	self->output_port->userdata = (struct MMAL_PORT_USERDATA_T *)&callback_data;
 	status = mmal_port_enable(self->output_port, camera_output_callback);
@@ -166,6 +171,7 @@ PyObject *RpiCamera_capture_stills(RpiCamera *self, PyObject *arg, PyObject *kwd
  	rpicamera_log_info("Starting capture.", NULL);
 	// Fire the capture
 	for(k=0;k<num_frames;k++){
+		callback_data.bytes_written = 0;
 		status = mmal_port_parameter_set_boolean(self->output_port, MMAL_PARAMETER_CAPTURE, MMAL_TRUE);
 
 		if(status != MMAL_SUCCESS){
@@ -175,14 +181,15 @@ PyObject *RpiCamera_capture_stills(RpiCamera *self, PyObject *arg, PyObject *kwd
 			// Wait for capture to complete
 			// For some reason using vcos_semaphore_wait_timeout sometimes returns immediately with bad parameter error
 			// even though it appears to be all correct, so reverting to untimed one until figure out why its erratic
+			if(self->debug_flag)
+				rpicamera_log_debug("WAITing on sempahore", NULL);						
 			vcos_semaphore_wait(&callback_data.complete_semaphore);
-			rpicamera_log_info("Frame %d finished.", k+1);			
+			if(self->debug_flag)
+				rpicamera_log_debug("Frame %d finished.", k+1);			
 		}
-
-		callback_data.bytes_written = 0;
-
 	}
-   	
+	rpicamera_log_info("Capture finished, got %d frames.", k+1);
+
 		
 	//Delete the semiphore
 	vcos_semaphore_delete(&callback_data.complete_semaphore);

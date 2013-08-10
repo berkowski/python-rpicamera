@@ -2,6 +2,7 @@
 #define RPICAMERA_H_
 
 #include <Python.h>
+#include "structmember.h"
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #define PY_ARRAY_UNIQUE_SYMBOL RPICAMERA_ARRAY_API
 #include <numpy/arrayobject.h>
@@ -10,7 +11,10 @@
 #include "RpiCamera_settings.h"
 #include "RpiCamera_capture.h"
 #include "RpiCamera_logging.h"
+
+// #include "interface/vcos/vcos_semaphore.h"
 PyObject *RPICAMERA_MODULE_LOGGER=NULL;
+// VCOS_SEMAPHORE_T *logging_semaphore;
 
 static PyObject *RpiCamera_set_output_format(RpiCamera *self, PyObject *args, PyObject *kwds);
 static PyObject *RpiCamera_get_output_format(RpiCamera *self, PyObject *args, PyObject *kwds);
@@ -26,10 +30,10 @@ static PyMethodDef RpiCamera_methods[] = {
 
 };
 
-// static PyMemberDef Camera_members[] = {
-//     {"image", T_OBJECT_EX, offsetof(Camera, image), 0, "Numpy image array"},
-//     {NULL, NULL, NULL, NULL, NULL}
-// };
+static PyMemberDef RpiCamera_members[] = {
+    {"debug", T_BOOL, offsetof(RpiCamera, debug_flag), 0, "Enable debug message logging"},
+    {NULL, NULL, NULL, NULL, NULL}
+};
 
 static PyObject *RpiCamera_get_image(RpiCamera *self, void *closure);
 static PyObject *RpiCamera_get_camera_setting(RpiCamera *self, void *closure);
@@ -90,7 +94,7 @@ static PyTypeObject RpiCameraType = {
     0,                         /* tp_iter */
     0,                         /* tp_iternext */
     RpiCamera_methods,  /* tp_methods */
-    0, //Camera_members,  /* tp_members */
+    RpiCamera_members,  /* tp_members */
     RpiCamera_getseters,                         /* tp_getset */
     0,                         /* tp_base */
     0,                         /* tp_dict */
@@ -102,16 +106,23 @@ static PyTypeObject RpiCameraType = {
     RpiCamera_new,                 /* tp_new */
 };
 
+// void Free_RpiCameraModule(void){
+//     if (logging_semaphore)
+//         vcos_semaphore_delete(logging_semaphore);
+// }
+
 static PyModuleDef RpiCameraModule = {
     PyModuleDef_HEAD_INIT,
     "rpicamera",
     "Python module for use witht he RPi Camera",
     -1,
-    NULL, NULL, NULL, NULL, NULL
+    NULL, NULL, NULL, NULL, NULL //Free_RpiCameraModule
 };
 
 PyMODINIT_FUNC
 PyInit_RpiCamera(void){
+
+    // vcos_semaphore_create(logging_semaphore, "log_semaphore", 1);
 
     import_array();
     if (PyType_Ready(&RpiCameraType) < 0)
