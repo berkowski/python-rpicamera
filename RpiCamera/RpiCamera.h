@@ -1,3 +1,34 @@
+/*  Copyright (c) Zachary Berkowitz
+    All rights reserved.
+
+    This file is part of the RpiCamera python extension for the
+    Raspberry Pi camera module, derived from James Hughes'
+    Raspi* family of command-line driven programs which can be found
+    at https://github.com/raspberrypi/userland/
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are met:
+        * Redistributions of source code must retain the above copyright
+          notice, this list of conditions and the following disclaimer.
+        * Redistributions in binary form must reproduce the above copyright
+          notice, this list of conditions and the following disclaimer in the
+          documentation and/or other materials provided with the distribution.
+        * Neither the name of the copyright holder nor the
+          names of its contributors may be used to endorse or promote products
+          derived from this software without specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+    ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+    DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
+    DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+*/
+
 #ifndef RPICAMERA_H_
 #define RPICAMERA_H_
 
@@ -7,32 +38,31 @@
 #define PY_ARRAY_UNIQUE_SYMBOL RPICAMERA_ARRAY_API
 #include <numpy/arrayobject.h>
 
+#include "host_applications/linux/libs/bcm_host/include/bcm_host.h"
+
 #include "RpiCamera_types.h"
 #include "RpiCamera_settings.h"
 #include "RpiCamera_capture.h"
 #include "RpiCamera_logging.h"
 
-// #include "interface/vcos/vcos_semaphore.h"
 PyObject *RPICAMERA_MODULE_LOGGER=NULL;
-// VCOS_SEMAPHORE_T *logging_semaphore;
 
 static PyObject *RpiCamera_set_output_format(RpiCamera *self, PyObject *args, PyObject *kwds);
 static PyObject *RpiCamera_get_output_format(RpiCamera *self, PyObject *args, PyObject *kwds);
+PyObject *RpiCamera_switch_output(RpiCamera *self, PyObject *args);
 
 static PyMethodDef RpiCamera_methods[] = {
-    {"set_output_format", (PyCFunctionWithKeywords)RpiCamera_set_output_format, METH_VARARGS | METH_KEYWORDS,
-        NULL},
-    {"get_output_format", (PyCFunctionWithKeywords)RpiCamera_get_output_format, METH_VARARGS | METH_KEYWORDS,
-        NULL},
-    {"capture_still_frames", (PyCFunctionWithKeywords)RpiCamera_capture_stills, METH_VARARGS | METH_KEYWORDS,
-        "Capture still frame(s) using the currently loaded format."},
-    {NULL, NULL, NULL, NULL}
+    {"set_output_format", (PyCFunction)RpiCamera_set_output_format, METH_VARARGS | METH_KEYWORDS, "Set the output format."},
+    {"get_output_format", (PyCFunction)RpiCamera_get_output_format, METH_VARARGS | METH_KEYWORDS, "Get the output format."},
+    {"integrate_preview_frames", (PyCFunction)RpiCamera_integrated_preview, METH_VARARGS | METH_KEYWORDS, "Capture still frame(s) using the currently loaded format."},
+    {"switch_output_port", (PyCFunction)RpiCamera_switch_output, METH_VARARGS, "Capture still frame(s) using the currently loaded format."},
+    {NULL}
 
 };
 
 static PyMemberDef RpiCamera_members[] = {
     {"debug", T_BOOL, offsetof(RpiCamera, debug_flag), 0, "Enable debug message logging"},
-    {NULL, NULL, NULL, NULL, NULL}
+    {NULL}
 };
 
 static PyObject *RpiCamera_get_image(RpiCamera *self, void *closure);
@@ -145,6 +175,13 @@ PyInit_RpiCamera(void){
     //Add Camera Object
     PyModule_AddObject(m, "Camera", (PyObject *)&RpiCameraType);
     PyModule_AddObject(m, "logger", RPICAMERA_MODULE_LOGGER);
+
+    //Add some constants
+    PyModule_AddObject(m, "CAMERA_STILL", PyLong_FromLong(MMAL_CAMERA_CAPTURE_PORT));
+    PyModule_AddObject(m, "CAMERA_VIDEO", PyLong_FromLong(MMAL_CAMERA_VIDEO_PORT));
+    PyModule_AddObject(m, "CAMERA_PREVIEW", PyLong_FromLong(MMAL_CAMERA_PREVIEW_PORT));
+    PyModule_AddObject(m, "YUV_420I", PyLong_FromLong(MMAL_ENCODING_I420));
+    PyModule_AddObject(m, "BGR24", PyLong_FromLong(MMAL_ENCODING_BGR24));
 
     //Initialize BCM host board 
     bcm_host_init();

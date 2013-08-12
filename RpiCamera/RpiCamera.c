@@ -1,12 +1,42 @@
+/*  Copyright (c) Zachary Berkowitz
+    All rights reserved.
+
+    This file is part of the RpiCamera python extension for the
+    Raspberry Pi camera module, derived from James Hughes'
+    Raspi* family of command-line driven programs which can be found
+    at https://github.com/raspberrypi/userland/
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are met:
+        * Redistributions of source code must retain the above copyright
+          notice, this list of conditions and the following disclaimer.
+        * Redistributions in binary form must reproduce the above copyright
+          notice, this list of conditions and the following disclaimer in the
+          documentation and/or other materials provided with the distribution.
+        * Neither the name of the copyright holder nor the
+          names of its contributors may be used to endorse or promote products
+          derived from this software without specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+    ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+    DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
+    DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+*/
 #include "interface/mmal/util/mmal_default_components.h"
 #include "interface/mmal/util/mmal_util_params.h"
+#include "interface/mmal/util/mmal_util.h"
+#include "interface/mmal/mmal_pool.h"
+#include "interface/vcos/vcos_types.h"
+#include "interface/vcos/vcos_semaphore.h"
 
 #include "RpiCamera.h"
-
-// Standard port setting for the camera component
-#define MMAL_CAMERA_PREVIEW_PORT 0
-#define MMAL_CAMERA_VIDEO_PORT 1
-#define MMAL_CAMERA_CAPTURE_PORT 2
+#include "RpiCamera_capture.h"
 
 // Stills format information
 #define DEFAULT_STILLS_FRAME_RATE_NUM 3
@@ -26,6 +56,7 @@
 #define DEFAULT_VIDEO_OUTPUT_BUFFERS_NUM 3
 
 /*  Private helper functions */
+
 
 void __camera_control_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer){
     // fprintf(stderr, "Camera control callback  cmd=0x%08x", buffer->cmd);
@@ -65,7 +96,7 @@ MMAL_STATUS_T __set_default_camera_parameters(MMAL_COMPONENT_T *camera){
 
 MMAL_STATUS_T __setup_camera(RpiCamera *RpiCamera){
 
-    MMAL_STATUS_T status;
+    MMAL_STATUS_T status = MMAL_SUCCESS;
     MMAL_COMPONENT_T *camera = NULL;
     MMAL_ES_FORMAT_T *format;
     MMAL_PORT_T *preview_port, *video_port, *still_port;
@@ -133,7 +164,7 @@ MMAL_STATUS_T __setup_camera(RpiCamera *RpiCamera){
     preview_port = camera->output[MMAL_CAMERA_PREVIEW_PORT];
     format = preview_port->format;
 
-    format->encoding = MMAL_ENCODING_OPAQUE;
+    format->encoding = MMAL_ENCODING_I420;
     format->encoding_variant = MMAL_ENCODING_I420;
 
     format->es->video.width = DEFAULT_PREVIEW_WIDTH;
@@ -222,7 +253,6 @@ static PyObject *
 RpiCamera_new(PyTypeObject *type, PyObject *args, PyObject *kwds){
 
     RpiCamera *self;
-    // npy_intp *img_dims[3] = {0, 0, 0};
     int img_dim = 0;
 
     self = (RpiCamera *)type->tp_alloc(type, 0);
@@ -242,15 +272,30 @@ static int
 RpiCamera_init(RpiCamera *self, PyObject *args, PyObject *kwds){
 
     MMAL_STATUS_T status;
-    MMAL_ES_FORMAT_T *format;
+    MMAL_PORT_T *port;
+    // MMAL_ES_FORMAT_T *format;
+    // VCOS_STATUS_T vcos_status = VCOS_SUCCESS;
 
     status = __setup_camera(self);
 
     if (status != MMAL_SUCCESS)
         return (int)status;
 
-    self->output_port = self->camera->output[MMAL_CAMERA_CAPTURE_PORT];
-    self->pool = mmal_port_pool_create(self->output_port, self->output_port->buffer_num, self->output_port->buffer_size);
+    self->output_port = MMAL_CAMERA_PREVIEW_PORT;
+    port = self->camera->output[MMAL_CAMERA_PREVIEW_PORT];
+
+    self->pool = mmal_port_pool_create(port, port->buffer_num, port->buffer_size);
+    self->complete_semaphore = (VCOS_SEMAPHORE_T *) malloc(sizeof(VCOS_SEMAPHORE_T));
+
+    if(self->complete_semaphore == NULL){
+        rpicamera_log_fatal("Unable to alloc memory for completion semaphore",  NULL);
+        return -1;
+    }
+
+    if (vcos_semaphore_create(self->complete_semaphore, "RpiCamera-sem", 0) != VCOS_SUCCESS){
+        rpicamera_log_fatal("Unable to create completion semaphore.", NULL);
+        return -1;
+    }
 
     return 0;
 }
@@ -264,7 +309,12 @@ RpiCamera_dealloc (RpiCamera *self){
         mmal_component_destroy(self->camera);
 
     if (self->pool)
-        mmal_pool_destroy(self->pool);
+        mmal_port_pool_destroy(self->camera->output[self->output_port], self->pool);
+
+    if (self->complete_semaphore){
+        vcos_semaphore_delete(self->complete_semaphore);
+        free(self->complete_semaphore);
+    }
 
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
@@ -274,7 +324,6 @@ RpiCamera_dealloc (RpiCamera *self){
 */
 static PyObject *
 RpiCamera_get_image(RpiCamera *self, void *closure){
-
     Py_INCREF(self->image);
     return self->image;
 }
@@ -347,7 +396,7 @@ RpiCamera_set_output_format(RpiCamera *self, PyObject *args, PyObject *kwds){
 
     switch (encoding){
         case MMAL_ENCODING_I420:
-        case MMAL_ENCODING_RGB24:
+        case MMAL_ENCODING_BGR24:
             break;
 
         default:
@@ -356,6 +405,12 @@ RpiCamera_set_output_format(RpiCamera *self, PyObject *args, PyObject *kwds){
     }
 
     port = self->camera->output[channel];
+    
+    if(port->is_enabled){
+        rpicamera_log_debug("Disabling output port prior to setting format", NULL);
+        mmal_port_disable(port);
+    }
+
     format = port->format;
 
     format->encoding = encoding;
@@ -375,11 +430,27 @@ RpiCamera_set_output_format(RpiCamera *self, PyObject *args, PyObject *kwds){
 
     port->buffer_num = port->buffer_num_recommended;
 
+    rpicamera_log_debug("Creating new buffer pool...", NULL);
+    rpicamera_log_debug("     Destroying old pool...", NULL);
+    mmal_port_pool_destroy(port, self->pool);
+    self->pool = (MMAL_POOL_T *)NULL;
+    
+    rpicamera_log_debug("     Creating new pool...", NULL);
+    self->pool = mmal_port_pool_create(port, port->buffer_num, port->buffer_size);
+    
+    free(self->complete_semaphore);
+    self->complete_semaphore = (VCOS_SEMAPHORE_T *) malloc(sizeof(VCOS_SEMAPHORE_T));
+
+    if(!self->pool){
+        PyErr_SetString(PyExc_RuntimeError, "Unable to create new camera pool.");
+        return NULL;        
+    }
+
     if(mmal_port_format_commit(port) != MMAL_SUCCESS){
         PyErr_SetString(PyExc_RuntimeError, "Unable to commit format to camera output port");
         return NULL;
     }
-    
+
     Py_RETURN_NONE;
 }
 
@@ -431,12 +502,15 @@ RpiCamera_get_camera_setting(RpiCamera *self, void *closure){
 
     int32_t param = (int32_t)closure;
     int32_t value;
-    uint8_t k;
 
-    PyObject *result, *dict, *tuple;
 
-    MMAL_PARAMETER_CAMERA_INFO_T cam_info;
-    MMAL_STATUS_T status;
+    PyObject *result;
+    
+    // PyObject *dict, *tuple;
+    // MMAL_PARAMETER_CAMERA_INFO_T cam_info;
+    // uint8_t k;
+
+    MMAL_STATUS_T status = MMAL_SUCCESS;
 
     switch(param){
         case MMAL_PARAMETER_SATURATION:
@@ -537,6 +611,10 @@ RpiCamera_get_camera_setting(RpiCamera *self, void *closure){
 
         //     PyDict_SetItemString(result, "flashes", tuple);
         //     break;
+
+        default:
+            PyErr_Format(PyExc_RuntimeError, "Unknown parameter id:  %d", param);
+            return NULL;
     }
 
     if (status != MMAL_SUCCESS){
@@ -553,9 +631,8 @@ RpiCamera_set_camera_setting(RpiCamera *self, PyObject *py_value, void *closure)
 
     int32_t param = (int32_t)closure;
     int32_t value;
-    PyObject *result;
 
-    MMAL_STATUS_T status;
+    MMAL_STATUS_T status = MMAL_SUCCESS;
 
     if (!PyLong_Check(py_value)){
         PyErr_SetString(PyExc_ValueError, "Expected an integer.");
@@ -626,59 +703,51 @@ RpiCamera_set_camera_setting(RpiCamera *self, PyObject *py_value, void *closure)
 
     return 0;
 }
-static PyObject *
-RpiCamera_get_camera_settings(RpiCamera *self, void *closure){
+PyObject *
+RpiCamera_switch_output(RpiCamera *self, PyObject *args){
 
-    PyObject *settings = PyDict_New();
-    if (!settings)
-        return settings;
+    uint8_t channel;
+    MMAL_PORT_T *port;
 
-    int32_t  p32;
-    MMAL_STATUS_T status = MMAL_SUCCESS;
+    if (!PyArg_ParseTuple(args,"B", &channel))
+        return NULL;
 
+    if (channel < 0 || channel > 2){
+        PyErr_Format(PyExc_ValueError, "Channel must be one of 0, 1, or 2 (given %d)", channel);
+        return NULL;
+    }
 
-    status |= get_camera_saturation(self->camera,  &p32);
-    PyDict_SetItemString(settings, "saturation", PyLong_FromLong((long)p32));
+    //If this is the current port already, don't do anything.
+    if(channel == self->output_port)
+        Py_RETURN_NONE;
 
-    status |= get_camera_sharpness(self->camera, &p32);
-    PyDict_SetItemString(settings, "sharpness", PyLong_FromLong((long)p32));
+    port = self->camera->output[self->output_port];
+    //Disable output port
+    if(port && port->is_enabled){
+        mmal_port_disable(port);
+    }
 
-    status |= get_camera_contrast(self->camera, &p32);
-    PyDict_SetItemString(settings, "contrast", PyLong_FromLong((long)p32));
+    rpicamera_log_debug("Destroying old buffer pool...", NULL);
+    mmal_port_pool_destroy(port, self->pool);
+    self->pool = (MMAL_POOL_T *)NULL;
+    
 
-    status |= get_camera_brightness(self->camera, &p32);
-    PyDict_SetItemString(settings, "brightness", PyLong_FromLong((long)p32));
+    rpicamera_log_debug("Switching to output %d", channel);
+    self->output_port = channel;
+    port = self->camera->output[channel];
 
-    status |= get_camera_iso(self->camera, (uint32_t *) &p32);
-    PyDict_SetItemString(settings, "iso", PyLong_FromLong((long)p32));
+    if (port->buffer_size < port->buffer_size_min)
+        port->buffer_size = port->buffer_size_min;
 
-    status |= get_camera_metering_mode(self->camera, (MMAL_PARAM_EXPOSUREMETERINGMODE_T *) &p32);
-    PyDict_SetItemString(settings, "metering_mode", PyLong_FromLong((long)p32));
+    port->buffer_num = port->buffer_num_recommended;
 
-    status |= get_camera_exposure_compensation(self->camera, &p32);
-    PyDict_SetItemString(settings, "exposure_compensation", PyLong_FromLong((long)p32));
+    rpicamera_log_debug("Creating new pool...", NULL);
+    self->pool = mmal_port_pool_create(port, port->buffer_num, port->buffer_size);
 
-    status |= get_camera_video_stabilisation(self->camera, (MMAL_BOOL_T *) &p32);
-    PyDict_SetItemString(settings, "video_stabilisation", PyLong_FromLong((long)p32));
+    if(!self->pool){
+        PyErr_SetString(PyExc_RuntimeError, "Unable to create new buffer pool.");
+        return NULL;
+    }
 
-    status |= get_camera_exposure_mode(self->camera, (MMAL_PARAM_EXPOSUREMODE_T *) &p32);
-    PyDict_SetItemString(settings, "exposure_mode", PyLong_FromLong((long)p32));
-
-    status |= get_camera_awb_mode(self->camera, (MMAL_PARAM_AWBMODE_T *) &p32);
-    PyDict_SetItemString(settings, "awb_mode", PyLong_FromLong((long)p32));
-
-    status |= get_camera_image_fx(self->camera, (MMAL_PARAM_IMAGEFX_T *) &p32);
-    PyDict_SetItemString(settings, "image_fx", PyLong_FromLong((long)p32));
-
-    // status |= get_camera_colour_fx(self->camera, (MMAL_PARAMETER_COLOURFX_T *) &p32);
-    // PyDict_SetItemString(settings, "", PyLong_FromLong((long)p32));
-
-    status |= get_camera_rotation(self->camera, &p32);
-    PyDict_SetItemString(settings, "rotation", PyLong_FromLong((long)p32));
-
-    status |= get_camera_flips(self->camera, (MMAL_PARAM_MIRROR_T *) &p32);
-    PyDict_SetItemString(settings, "flips", PyLong_FromLong((long)p32));
-
-
-    return settings;
+    Py_RETURN_NONE;
 }
