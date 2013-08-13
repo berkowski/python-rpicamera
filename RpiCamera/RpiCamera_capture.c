@@ -1,33 +1,36 @@
-/*  Copyright (c) Zachary Berkowitz
-    All rights reserved.
+/*
+Copyright (c) Zachary Berkowitz
+All rights reserved.
 
-    This file is part of the RpiCamera python extension for the
-    Raspberry Pi camera module, derived from James Hughes'
-    Raspi* family of command-line driven programs which can be found
-    at https://github.com/raspberrypi/userland/
+This file is part of the RpiCamera python extension for the
+Raspberry Pi camera module.  Current sources can be found at
+https://github.com/berkowski/python-rpicamera/
 
-    Redistribution and use in source and binary forms, with or without
-    modification, are permitted provided that the following conditions are met:
-    
-    *  Redistributions of source code must retain the above copyright
-       notice, this list of conditions and the following disclaimer.
-    *  Redistributions in binary form must reproduce the above copyright
-       notice, this list of conditions and the following disclaimer in the
-       documentation and/or other materials provided with the distribution.
-    *  Neither the name of the copyright holder nor the
-       names of its contributors may be used to endorse or promote products
-       derived from this software without specific prior written permission.
+Substantial work was derived from James Hughes' Raspi* family of 
+command-line driven programs, which can be found at:
+https://github.com/raspberrypi/userland/
 
-    THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ''AS IS'' AND ANY
-    EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-    DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
-    DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.    
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the copyright holder nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <Python.h>
@@ -350,3 +353,104 @@ PyObject *RpiCamera_integrated_preview(RpiCamera *self, PyObject *arg, PyObject 
 }
 
 
+PyObject *RpiCamera_capture_still(RpiCamera *self){
+
+	// MMAL_ES_FORMAT_T *format = self->output_port->format;
+	MMAL_BUFFER_HEADER_T *pool_buffer;
+	MMAL_PORT_T *output_port = self->camera->output[self->output_port];
+	INTEGRATED_PREVIEW_USERDATA_T integrated_preview_callback_data;
+   	
+   	// VCOS_STATUS_T vcos_status = VCOS_SUCCESS;
+	uint32_t status = 0;
+	//Indexes
+	uint32_t k = 0;
+
+
+	if (check_resize_image_buffer(self, output_port))
+		//There was a problem checking/resizing the image buffer.
+		//Errors have already been raised, so just exit.
+		return NULL;
+
+	//Clear image object
+	PyArray_FILLWBYTE((PyArrayObject *)self->image, 0);
+
+
+	//Setup callback data structure
+	integrated_preview_callback_data.buffer_pool = self->pool;
+	integrated_preview_callback_data.bytes_written = 0;
+	integrated_preview_callback_data.shift = 0;
+
+	integrated_preview_callback_data.image_size = (uint32_t) PyArray_Size(self->image);
+	integrated_preview_callback_data.image_data = (uint8_t *) PyArray_GETPTR1((PyArrayObject *)self->image, 0);
+	integrated_preview_callback_data.current_frame = 0;
+	integrated_preview_callback_data.num_frames = 1;
+	integrated_preview_callback_data.capture_complete = 0;
+	integrated_preview_callback_data.debug = (uint8_t)self->debug_flag;
+	integrated_preview_callback_data.complete_semaphore = self->complete_semaphore;
+
+	// vcos_status = vcos_semaphore_create(&integrated_preview_callback_data.complete_semaphore, "RpiCamera-sem", 0);
+	// vcos_assert(vcos_status == VCOS_SUCCESS);
+
+	output_port->userdata = (struct MMAL_PORT_USERDATA_T *)&integrated_preview_callback_data;
+
+	if(self->debug_flag)
+		rpicamera_log_debug("Flushing output port", NULL);
+
+	mmal_port_flush(output_port);
+
+	status = mmal_port_enable(output_port, integrated_preview_callback);
+
+	if (status != MMAL_SUCCESS){
+		PyErr_SetString(PyExc_RuntimeError, "Could not enable preview output port");
+		return NULL;
+	}
+
+	//Send all buffers to the output port
+	if(self->debug_flag)
+		rpicamera_log_debug("Sending %d buffers...", mmal_queue_length(self->pool->queue));
+
+    for (k=0;k<mmal_queue_length(self->pool->queue); k++){
+ 		pool_buffer = mmal_queue_get(self->pool->queue);
+ 		if (!pool_buffer)
+            rpicamera_log_warning("Unable to get a required buffer %d from pool queue", k);
+
+        if (mmal_port_send_buffer(output_port, pool_buffer)!= MMAL_SUCCESS)
+            rpicamera_log_warning("Unable to send a buffer to camera output port (%d)", k);
+                 
+ 	}
+
+ 	rpicamera_log_info("Starting still capture.", NULL);
+ 	status = mmal_port_parameter_set_boolean(self->camera->output[MMAL_CAMERA_CAPTURE_PORT], MMAL_PARAMETER_CAPTURE, MMAL_TRUE);
+	if(status != MMAL_SUCCESS){
+		rpicamera_log_error("%s: Failed to start capture", __func__);
+	}
+
+	else{
+		// Wait for capture to complete
+		// For some reason using vcos_semaphore_wait_timeout sometimes returns immediately with bad parameter error
+		// even though it appears to be all correct, so reverting to untimed one until figure out why its erratic
+		if(self->debug_flag)
+			rpicamera_log_debug("WAITing on sempahore", NULL);
+		vcos_semaphore_wait(integrated_preview_callback_data.complete_semaphore);
+
+	}
+	status = mmal_port_parameter_set_boolean(self->camera->output[MMAL_CAMERA_CAPTURE_PORT], MMAL_PARAMETER_CAPTURE, MMAL_FALSE);
+	integrated_preview_callback_data.capture_complete = 1;
+	rpicamera_log_info("Still capture finished.", NULL);
+
+		
+	//Delete the semiphore
+	// vcos_semaphore_delete(&callback_data.complete_semaphore);
+
+
+	//Disable the output port
+	if(output_port && output_port->is_enabled){
+		mmal_port_disable(output_port);
+		output_port->userdata = (struct MMAL_PORT_USERDATA_T *) NULL;
+
+	}
+
+	// mmal_port_flush(self->output_port);
+
+	Py_RETURN_NONE;
+}

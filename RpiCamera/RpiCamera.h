@@ -47,15 +47,78 @@
 
 PyObject *RPICAMERA_MODULE_LOGGER=NULL;
 
+PyDoc_STRVAR(set_output_format__doc__, 
+"set_output_format(channel[, width, height, width_offset, height_offset,\n"
+"                           crop_width, crop_height, frame_rate_num,\n"
+"                           frame_rate_den, encoding])\n\n"
+"Sets the output format for the desired camera port.\n\n\n"
+":param channel:  Which port to set the format for.\n"
+":type channel:  int.\n\n"
+":param width:  Format buffer width.\n"
+":type width:  int.\n\n"
+":param height:  Format buffer height.\n"
+":type height:  int.\n\n"
+":param width_offset:  Format sensor horizontal offset.\n"
+":type width_offset:  int.\n\n"
+":param height_offset:  Format sensor vertical offset.\n"
+":type height_offset:  int.\n\n"
+":param crop_width:  Format width.\n"
+":type crop_width:  int.\n\n"
+":param crop_height:  Format height.\n"
+":type crop_height:  int.\n\n"
+":param frame_rate_num:  Numerator of the output frame rate.\n"
+":type frame_rate_num:  int.\n\n"
+":param frame_rate_den:  Denominator of the output frame rate.\n"
+":type frame_rate_den:  int.\n\n"
+":param encoding:  Encoding.\n"
+":type encoding:  int.\n\n\n"
+"Camera channels:\n"
+"   Use following constants to set the output channel:\n"
+"   RpiCamera.CAMERA_STILL      Use the still capture output.\n"
+"   RpiCamera.CAMERA_PREVIEW    Use the preview output.\n\n"
+"Image geometry:\n"
+"   Total size (in pixels) of the image read is width*height.  However,\n"
+"   the actual image data (valid pixels) will be crop_width*crop_height,\n"
+"   with top-right corner offset of (width_offset, height_offset)\n\n"
+"Framerates:\n"
+"   Framerates are encoded as rational numbers, with the numerator and denominator\n"
+"   listed speparately.  In most cases we are interested in integer framerates, for\n"
+"   example, 20 FPS would have a numerator of 20 and a denominator of 1\n\n"
+"Encoding:\n"
+"   Two encoding options for stills are available:  YUV_420I and BGR24.\n"
+"   Set the encoding type using the constants:  RpiCamera.YUV_420I and RpiCamera.BGR24\n\n"
+"   For an image size of HxW, a YUV_420I image will have a total of\n"
+"   1.5*H*W bytes of data, the BGR24 image will have 3*H*W.  For details\n"
+"   on each format, see:\n"
+"   http://en.wikipedia.org/wiki/YUV#Y.27UV420p_.28and_Y.27V12_or_YV12.29_to_RGB888_conversion\n"
+"   http://msdn.microsoft.com/en-us/library/system.windows.media.pixelformats.bgr24.aspx.");
 static PyObject *RpiCamera_set_output_format(RpiCamera *self, PyObject *args, PyObject *kwds);
+
+PyDoc_STRVAR(get_output_format__doc__, 
+"get_output_format(channel)\n\n"
+"Gets the output format for the desired camera port.\n\n\n"
+":param channel:  Which port to set the format for.\n"
+":type channel:  int.\n\n"
+":returns format:  Dictionary with the format specification (see RpiCamera.Camera.set_output_format).\n");
 static PyObject *RpiCamera_get_output_format(RpiCamera *self, PyObject *args, PyObject *kwds);
+
+
+PyDoc_STRVAR(switch_output__doc__,
+"switch_output(channel)\n\n"
+"Switches the output channel used for capturing still images with\n"
+"RpiCamera.Camera.capture_still_image.\n\n"
+"Camera channels:\n"
+"   Use following constants to set the output channel:\n"
+"   RpiCamera.CAMERA_STILL      Use the still capture output.\n"
+"   RpiCamera.CAMERA_PREVIEW    Use the preview output.\n\n");
 PyObject *RpiCamera_switch_output(RpiCamera *self, PyObject *args);
 
 static PyMethodDef RpiCamera_methods[] = {
-    {"set_output_format", (PyCFunction)RpiCamera_set_output_format, METH_VARARGS | METH_KEYWORDS, "Set the output format."},
-    {"get_output_format", (PyCFunction)RpiCamera_get_output_format, METH_VARARGS | METH_KEYWORDS, "Get the output format."},
-    {"integrate_preview_frames", (PyCFunction)RpiCamera_integrated_preview, METH_VARARGS | METH_KEYWORDS, "Capture still frame(s) using the currently loaded format."},
-    {"switch_output_port", (PyCFunction)RpiCamera_switch_output, METH_VARARGS, "Capture still frame(s) using the currently loaded format."},
+    {"set_output_format", (PyCFunction)RpiCamera_set_output_format, METH_VARARGS | METH_KEYWORDS, set_output_format__doc__},
+    {"get_output_format", (PyCFunction)RpiCamera_get_output_format, METH_VARARGS | METH_KEYWORDS, get_output_format__doc__},
+    {"integrate_preview_frames", (PyCFunction)RpiCamera_integrated_preview, METH_VARARGS | METH_KEYWORDS, integrate_preview_frames__doc__},
+    {"capture_still_image", (PyCFunction)RpiCamera_capture_still, METH_NOARGS, capture_still_image__doc__},
+    {"switch_output_port", (PyCFunction)RpiCamera_switch_output, METH_VARARGS, switch_output__doc__},
     {NULL}
 
 };
