@@ -60,12 +60,12 @@ Again; highly recommended you do this in a virtualenv.
 Usage
 -----
 
-Basic usage follows :
+Basic usage follows:
 
-    #.  Create a camera instance
-    #.  Set an output format
-    #.  Adjust some camera parameters
-    #.  Capture some data
+    1.  Create a camera instance
+    2.  Set an output format
+    3.  Adjust some camera parameters
+    4.  Capture some data
 
 Camera instances are easily created with::
 
