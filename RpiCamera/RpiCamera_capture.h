@@ -39,11 +39,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "RpiCamera_types.h"
 
 PyDoc_STRVAR(capture_still_image__doc__,
-"capture_still_image()\n\n"
-"Captures a still image using the current selected output channel.\n"
+"capture_still_image([channel=RpiCamera.CAMERA_STILL])\n\n"
+"Captures a still image using the selected output channel.\n"
 "The captured image is stored in the read-only buffer attribute\n"
-"Camera.image");
-PyObject *RpiCamera_capture_still(RpiCamera *self);
+"Camera.image\n\n"
+":param channel:  Output channel to use.\n"
+":type channel: int\n\n"
+"Camera channels:\n"
+"   Use following constants to set the output channel:\n"
+"   RpiCamera.CAMERA_STILL      Use the still capture output.\n"
+"   RpiCamera.CAMERA_PREVIEW    Use the preview output."
+);
+PyObject *RpiCamera_capture_still(RpiCamera *self, PyObject *args, PyObject *kwds);
+
 PyDoc_STRVAR(integrate_preview_frames__doc__,
 "integrate_preview_frames([frames=1, shift=0])\n\n"
 "Sums a series of frames captured on the camera's preview channel.\n"

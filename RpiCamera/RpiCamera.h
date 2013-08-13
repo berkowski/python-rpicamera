@@ -52,7 +52,7 @@ PyDoc_STRVAR(set_output_format__doc__,
 "                           crop_width, crop_height, frame_rate_num,\n"
 "                           frame_rate_den, encoding])\n\n"
 "Sets the output format for the desired camera port.\n\n\n"
-":param channel:  Which port to set the format for.\n"
+":param channel:  Set the output port.\n"
 ":type channel:  int.\n\n"
 ":param width:  Format buffer width.\n"
 ":type width:  int.\n\n"
@@ -117,8 +117,8 @@ static PyMethodDef RpiCamera_methods[] = {
     {"set_output_format", (PyCFunction)RpiCamera_set_output_format, METH_VARARGS | METH_KEYWORDS, set_output_format__doc__},
     {"get_output_format", (PyCFunction)RpiCamera_get_output_format, METH_VARARGS | METH_KEYWORDS, get_output_format__doc__},
     {"integrate_preview_frames", (PyCFunction)RpiCamera_integrated_preview, METH_VARARGS | METH_KEYWORDS, integrate_preview_frames__doc__},
-    {"capture_still_image", (PyCFunction)RpiCamera_capture_still, METH_NOARGS, capture_still_image__doc__},
-    {"switch_output_port", (PyCFunction)RpiCamera_switch_output, METH_VARARGS, switch_output__doc__},
+    {"capture_still_image", (PyCFunction)RpiCamera_capture_still, METH_VARARGS | METH_KEYWORDS, capture_still_image__doc__},
+    // {"switch_output_port", (PyCFunction)RpiCamera_switch_output, METH_VARARGS, switch_output__doc__},
     {NULL}
 
 };

@@ -353,19 +353,35 @@ PyObject *RpiCamera_integrated_preview(RpiCamera *self, PyObject *arg, PyObject 
 }
 
 
-PyObject *RpiCamera_capture_still(RpiCamera *self){
+PyObject *RpiCamera_capture_still(RpiCamera *self, PyObject *args, PyObject *kwds){
 
 	// MMAL_ES_FORMAT_T *format = self->output_port->format;
 	MMAL_BUFFER_HEADER_T *pool_buffer;
-	MMAL_PORT_T *output_port = self->camera->output[self->output_port];
+	MMAL_PORT_T *output_port;
 	INTEGRATED_PREVIEW_USERDATA_T integrated_preview_callback_data;
    	
-   	// VCOS_STATUS_T vcos_status = VCOS_SUCCESS;
+   	uint8_t channel = 2; //Default to still port output.
 	uint32_t status = 0;
 	//Indexes
 	uint32_t k = 0;
 
+	static char *kwlist[] = {"channel", NULL};
 
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|B", kwlist, &channel))
+		return NULL;
+
+
+	//Switch output port to preview port
+	PyObject *py_result = NULL;
+	if(self->output_port != channel){
+		rpicamera_log_debug("Attempting to switch to port %d.", channel);
+	 	py_result = RpiCamera_switch_output(self, Py_BuildValue("(B)", channel));
+
+		if(py_result == NULL)
+			return NULL;
+	}
+
+	output_port = self->camera->output[self->output_port];
 	if (check_resize_image_buffer(self, output_port))
 		//There was a problem checking/resizing the image buffer.
 		//Errors have already been raised, so just exit.

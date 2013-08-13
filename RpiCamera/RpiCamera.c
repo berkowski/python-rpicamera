@@ -286,8 +286,8 @@ RpiCamera_init(RpiCamera *self, PyObject *args, PyObject *kwds){
     if (status != MMAL_SUCCESS)
         return (int)status;
 
-    self->output_port = MMAL_CAMERA_PREVIEW_PORT;
-    port = self->camera->output[MMAL_CAMERA_PREVIEW_PORT];
+    self->output_port = MMAL_CAMERA_CAPTURE_PORT;
+    port = self->camera->output[self->output_port];
 
     self->pool = mmal_port_pool_create(port, port->buffer_num, port->buffer_size);
     self->complete_semaphore = (VCOS_SEMAPHORE_T *) malloc(sizeof(VCOS_SEMAPHORE_T));
@@ -455,6 +455,8 @@ RpiCamera_set_output_format(RpiCamera *self, PyObject *args, PyObject *kwds){
         PyErr_SetString(PyExc_RuntimeError, "Unable to commit format to camera output port");
         return NULL;
     }
+
+    self->output_port = channel;
 
     Py_RETURN_NONE;
 }
