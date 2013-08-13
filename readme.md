@@ -38,7 +38,7 @@ that you install this module inside a virtualenv.
 Building
 --------
 
-Clone the repository and grab the Raspberry Pi userland sources::
+Clone the repository and grab the Raspberry Pi userland sources:
 
     git clone https://github.com/berkowski/python-rpicamera.git
     git submodule init
@@ -49,7 +49,7 @@ expected.  Libraries are expected to reside in /opt/vc/lib.  If you've installed
 the userland libraries someplace else, change the `library_dirs` list in `setup.py`
 to point to the correct location.
 
-Build the module using the provided Python setup.py script::
+Build the module using the provided Python setup.py script:
 
     python setup.py build
     python setup.py install
@@ -67,7 +67,7 @@ Basic usage follows:
     3.  Adjust some camera parameters
     4.  Capture some data
 
-Camera instances are easily created with::
+Camera instances are easily created with:
 
     >>> c = RpiCamera.Camera()
 
@@ -75,7 +75,7 @@ Though only one camera instance can be active at a time.
 
 Use the `set_output_format` method to set an output format, see the docstring for details.
 But for an example, here we set the output format to YUV_420 at the maximum size
-of 2624x1956 (which includes the blanking rows/columns)::
+of 2624x1956 (which includes the blanking rows/columns):
 
     >>> c.set_output_format(RpiCamera.CAMERA_STILL, width=2624, height=1956, width_offset=0,
             height_offset=0, encoding=RpiCamera.YUV_420I)
@@ -118,7 +118,7 @@ Examples
 --------
 
 Capture a single 1024x768 frame in BGR24 format from the CAMERA_STILL output port, 
-display the result using matplotlib::
+display the result using matplotlib:
 
     from matplotlib import pyplot as plt
     import RpiCamera
@@ -135,10 +135,10 @@ display the result using matplotlib::
     img = c.image.reshape(3, 1024, 768, order='F').T
 
     #Need to reverse the color order, imshow expects RGB, not BGR
-    plt.imshow(img[:, :, -1::-1])
+    plt.imshow(img[:, :, -1:-1])
     plt.show()  
 
-Integrate 20 frames at 640x480 @ 60 FPS using YUV420::
+Integrate 20 frames at 640x480 @ 60 FPS using YUV420:
 
     from matplotlib import pyplot as plt
     import RpiCamera
@@ -146,7 +146,7 @@ Integrate 20 frames at 640x480 @ 60 FPS using YUV420::
     #We'll show some logging too
     import logging
     logging.basicConfig(level=logging.DEBUG, 
-        format='%(asctime)-15s %(name)s|%(levelname) 8s:: %(message)s')
+        format='%(asctime)-15s %(name)s|%(levelname) 8s: %(message)s')
 
     c = RpiCamera.Camera()
 
@@ -161,10 +161,8 @@ Integrate 20 frames at 640x480 @ 60 FPS using YUV420::
     #YUV_420 1D to 480x640 image:
     #Only interested in the intensity here, the 'Y' values,
     #which make up the first 480*640 'pixels'.
-    #order='F' is important here!
     img = c.image[:480*640].reshape(480, 640, order='C')
 
-    #Need to reverse the color order, imshow expects RGB, not BGR
     plt.imshow(img, cmap='gray')
     plt.show()
 
@@ -179,7 +177,7 @@ A Note on Formats
 You can use the set_output_fomat method to create arbitrary-sized output images, but some
 care is required when building the two-dimension array from the resulting image buffer.
 
-For example, say you wanted an 80x80 image, so you try::
+For example, say you wanted an 80x80 image, so you try:
 
     >>> c.set_output_format(RpiCamera.CAMERA_STILL, width=80, height=80)
     >>> c.get_output_format(RpiCamera.CAMERA_STILL)
