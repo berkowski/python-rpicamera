@@ -172,3 +172,25 @@ Logging
 -------
 The RpiCamera module uses the python logging module with a logger name 'RpiCamera'. See
 http://docs.python.org/3.3/library/logging.html for information using the logging module.
+
+A Note on Formats
+-----------------
+
+You can use the set_output_fomat method to create arbitrary-sized output images, but some
+care is required when building the two-dimension array from the resulting image buffer.
+
+For example, say you wanted an 80x80 image, so you try::
+
+    >>> c.set_output_format(RpiCamera.CAMERA_STILL, width=80, height=80)
+    >>> c.get_output_format(RpiCamera.CAMERA_STILL)
+        {'crop_height': 80, 'crop_width': 80, 'encoding': 808596553,
+            'frame_rate_den': 1, 'frame_rate_num': 15, 'height': 80,
+            'height_offset': 0, 'width': 96, 'width_offset': 0}
+
+What happened?  You wanted a width of 80, but a width of 96 was set.  Now, when you capture
+an image, the image dimensions will be 96x80 instead of 80x80!  HOWEVER, only the upper
+80x80 rectangle will have data! (note the crop_width=80 !)
+
+So while you can get arbitrary sized *images*, you cannot get arbitrary sized *buffers*.
+When playing around with image formats it's always useful to check the format after
+setting to make sure you know what the actual data dimensions are.
