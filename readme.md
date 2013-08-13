@@ -80,6 +80,24 @@ of 2624x1956 (which includes the blanking rows/columns)::
     >>> c.set_output_format(RpiCamera.CAMERA_STILL, width=2624, height=1956, width_offset=0,
             height_offset=0, encoding=RpiCamera.YUV_420I)
 
+Camera settings are exposed as various attributes such as `brightness`, or `saturation`
+on the camera object.  Currently the following attributes can be adjusted:
+
+    * saturation
+    * sharpness
+    * contrast
+    * brightness
+    * iso
+    * metering_mode
+    * exposure_compensation
+    * video_stabilisation
+    * exposure_mode
+    * awb_mode
+    * image_fx
+
+Right now only saturation, sharpness, contrast, and iso are straight-forward to adjust.
+The rest require enumeration paramters I haven't gotten around to exposing to the user.
+
 There are two methods of aquiring images: capturing a single image, or integrating
 multiple images.  Single-frame imaging can use either the RpiCamera.CAMERA_STILL port OR
 the RpiCamera.CAMERA_PREVIEW port.  Multi-frame integration can ONLY use the 
