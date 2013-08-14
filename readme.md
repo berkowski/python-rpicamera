@@ -24,7 +24,7 @@ you do with it after is up to you!
 Requirements
 ------------
 
-*  Python 3.x.  (Should work w/ 2.7, but has not been tested)
+*  Python 3.x.  (Does NOT work with 2.7.x)
 *  Raspberry Pi userland headers and libraries. 
 
 Recommendations
